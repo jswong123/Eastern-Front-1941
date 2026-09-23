@@ -650,6 +650,7 @@ function updateTurnUI() {
 
 
     const phaseName =
+
         phase === "soviet"
 
             ? "苏军行动"
@@ -875,13 +876,11 @@ function syncSelectedUnit(unit) {
 
 
     /*
-     * 这是这次的重要修改之一：
-     *
      * main.js
      * UnitSelection
      * Renderer
      *
-     * 三者必须共享同一个 selectedUnit。
+     * 三者共享同一个 selectedUnit。
      */
 
     selection.selectedUnit =
@@ -1136,16 +1135,9 @@ function showUnitInfo(unit) {
 // 计算移动范围
 // ============================================================
 
-// ============================================================
-// 计算移动范围
-// ============================================================
-
 function calculateReachable(unit) {
 
-    // --------------------------------------------------------
-    // 清除旧范围
-    // --------------------------------------------------------
-
+    // 清除上一个单位的移动范围
     clearReachable();
 
 
@@ -1156,12 +1148,11 @@ function calculateReachable(unit) {
     }
 
 
-    // --------------------------------------------------------
-    // 当前单位不能行动
-    // --------------------------------------------------------
-
+    // 只有玩家当前能够控制的单位才显示移动范围
     if (
-        !playerCanControlUnit(unit)
+        !playerCanControlUnit(
+            unit
+        )
     ) {
 
         return;
@@ -1170,7 +1161,7 @@ function calculateReachable(unit) {
 
 
     // --------------------------------------------------------
-    // 初始化移动数据
+    // 初始化 MovementSystem 中的单位移动数据
     // --------------------------------------------------------
 
     if (
@@ -1185,14 +1176,12 @@ function calculateReachable(unit) {
     }
 
 
-    // --------------------------------------------------------
-    // 同步行动点
-    //
-    // TurnSystem 使用 actionPoints
-    // MovementSystem 使用 movementPoints
-    //
-    // 暂时让两者保持一致
-    // --------------------------------------------------------
+    /*
+     * TurnSystem 当前主要使用 actionPoints，
+     * MovementSystem 使用 movementPoints。
+     *
+     * 在这里进行同步。
+     */
 
     const currentAP =
 
@@ -1216,12 +1205,7 @@ function calculateReachable(unit) {
 
 
     // --------------------------------------------------------
-    // MovementSystem.js 当前真正存在的方法：
-    //
-    // selectUnit(unit, units)
-    //
-    // 它内部会调用：
-    // Pathfinding.getReachableHexes()
+    // 当前 MovementSystem 的主接口
     // --------------------------------------------------------
 
     if (
@@ -1229,19 +1213,31 @@ function calculateReachable(unit) {
         "function"
     ) {
 
-        movementSystem.selectUnit(
+        try {
 
-            unit,
+            movementSystem.selectUnit(
+                unit,
+                units
+            );
 
-            units
+        }
 
-        );
+        catch (error) {
+
+            console.error(
+                "MovementSystem.selectUnit() 调用失败：",
+                error
+            );
+
+            return;
+
+        }
 
     }
 
 
     // --------------------------------------------------------
-    // 兼容以后可能增加的新接口
+    // 兼容其他 MovementSystem 版本
     // --------------------------------------------------------
 
     else if (
@@ -1249,22 +1245,34 @@ function calculateReachable(unit) {
         "function"
     ) {
 
-        const result =
-            movementSystem.calculateReachable(
+        try {
 
-                unit,
+            const result =
+                movementSystem.calculateReachable(
+                    unit,
+                    units
+                );
 
-                units
 
+            if (
+                result instanceof Map
+            ) {
+
+                movementSystem.reachable =
+                    result;
+
+            }
+
+        }
+
+        catch (error) {
+
+            console.error(
+                "MovementSystem.calculateReachable() 调用失败：",
+                error
             );
 
-
-        if (
-            result instanceof Map
-        ) {
-
-            movementSystem.reachable =
-                result;
+            return;
 
         }
 
@@ -1276,22 +1284,72 @@ function calculateReachable(unit) {
         "function"
     ) {
 
-        const result =
-            movementSystem.computeReachable(
+        try {
 
-                unit,
+            const result =
+                movementSystem.computeReachable(
+                    unit,
+                    units
+                );
 
-                units
 
+            if (
+                result instanceof Map
+            ) {
+
+                movementSystem.reachable =
+                    result;
+
+            }
+
+        }
+
+        catch (error) {
+
+            console.error(
+                "MovementSystem.computeReachable() 调用失败：",
+                error
             );
 
+            return;
+
+        }
+
+    }
+
+
+    else {
+
+        console.error(
+            "MovementSystem 中没有可用的移动范围计算接口"
+        );
+
+        return;
+
+    }
+
+
+    // --------------------------------------------------------
+    // 保证 reachable 始终为 Map
+    // --------------------------------------------------------
+
+    if (
+        !(movementSystem.reachable instanceof Map)
+    ) {
 
         if (
-            result instanceof Map
+            movementSystem.reachableHexes instanceof Map
         ) {
 
             movementSystem.reachable =
-                result;
+                movementSystem.reachableHexes;
+
+        }
+
+        else {
+
+            movementSystem.reachable =
+                new Map();
 
         }
 
@@ -1299,7 +1357,7 @@ function calculateReachable(unit) {
 
 
     // --------------------------------------------------------
-    // Renderer 同步
+    // 将结果交给 Renderer
     // --------------------------------------------------------
 
     if (
@@ -1313,33 +1371,28 @@ function calculateReachable(unit) {
 
     }
 
+    else {
 
-    // --------------------------------------------------------
-    // 调试
-    // --------------------------------------------------------
+        renderer.reachable =
+            movementSystem.reachable;
+
+    }
+
 
     console.log(
         "已选择单位：",
         unit
     );
 
-
     console.log(
         "单位移动点：",
         unit.movementPoints
     );
 
-
     console.log(
         "可移动格数量：",
-        movementSystem.reachable
-            instanceof Map
-
-            ? movementSystem.reachable.size
-
-            : 0
+        movementSystem.reachable.size
     );
-
 
     console.log(
         "可移动格：",
@@ -1347,81 +1400,6 @@ function calculateReachable(unit) {
     );
 
 }
-
-
-    let result = null;
-
-
-    // --------------------------------------------------------
-    // 尝试 MovementSystem 的不同接口
-    // --------------------------------------------------------
-
-    if (
-        typeof movementSystem.calculateReachable ===
-        "function"
-    ) {
-
-        result =
-            movementSystem.calculateReachable(
-                unit,
-                units
-            );
-
-    }
-
-    else if (
-        typeof movementSystem.computeReachable ===
-        "function"
-    ) {
-
-        result =
-            movementSystem.computeReachable(
-                unit,
-                units
-            );
-
-    }
-
-    else if (
-        typeof movementSystem.getReachableHexes ===
-        "function"
-    ) {
-
-        result =
-            movementSystem.getReachableHexes(
-                unit,
-                units
-            );
-
-    }
-
-
-    if (result instanceof Map) {
-
-        movementSystem.reachable =
-            result;
-
-    }
-
-
-    // --------------------------------------------------------
-    // Renderer
-    // --------------------------------------------------------
-
-    if (
-        typeof renderer.setReachable ===
-        "function"
-    ) {
-
-        renderer.setReachable(
-
-            result ??
-            movementSystem.reachable ??
-            movementSystem.reachableHexes
-
-        );
-
-    }
 
 
 // ============================================================
@@ -1468,7 +1446,11 @@ function selectUnit(unit) {
 
     /*
      * 无论 UnitSelection.select() 内部怎么实现，
-     * 这里都强制同步状态。
+     * 这里都强制同步：
+     *
+     * main.js
+     * UnitSelection
+     * Renderer
      */
 
     syncSelectedUnit(
@@ -1489,28 +1471,41 @@ function selectUnit(unit) {
     // 移动范围
     // --------------------------------------------------------
 
-   if (
-    playerCanControlUnit(
-        unit
-    )
-) {
+    if (
+        playerCanControlUnit(
+            unit
+        )
+    ) {
 
-    console.log("准备计算移动范围：", unit);
+        console.log(
+            "准备计算移动范围：",
+            unit
+        );
 
-    calculateReachable(
-        unit
-    );
 
-    console.log("移动范围计算完成");
+        calculateReachable(
+            unit
+        );
+
+
+        console.log(
+            "移动范围计算完成"
+        );
+
+    }
+
+    else {
+
+        clearReachable();
+
+    }
+
+
+    render();
 
 }
-else {
 
-    clearReachable();
 
-}
-
-render();
 // ============================================================
 // Hex 上查找单位
 // ============================================================
@@ -1560,7 +1555,7 @@ function getCanvasMousePosition(event) {
 
 
 // ============================================================
-// 屏幕 -> 世界坐标
+// 屏幕坐标 -> 世界坐标
 // ============================================================
 
 function screenToWorld(
@@ -1569,7 +1564,7 @@ function screenToWorld(
 ) {
 
     /*
-     * 如果 Renderer 已经提供转换函数，
+     * Renderer 如果已经提供坐标转换，
      * 优先使用 Renderer。
      */
 
@@ -1718,28 +1713,12 @@ function findUnitAtMouse(event) {
 
 
     /*
-     * ========================================================
      * 第一优先级：
      *
      * UnitSelection.findUnitAt()
      *
-     * 这是本次最重要的修复。
-     *
      * 单位最终显示在哪里，
      * UnitSelection 就在哪里进行屏幕命中检测。
-     *
-     * 不再：
-     *
-     * 鼠标
-     * ↓
-     * 世界坐标
-     * ↓
-     * Hex
-     * ↓
-     * 单位
-     *
-     * 才判断是否点击单位。
-     * ========================================================
      */
 
     if (
@@ -1786,14 +1765,10 @@ function findUnitAtMouse(event) {
 
 
     /*
-     * ========================================================
      * 第二优先级：
      *
-     * 直接按照 Renderer 实际单位屏幕位置进行命中检测。
-     *
-     * 这样即使 UnitSelection 接口版本不一致，
-     * 单位仍然可以点击。
-     * ========================================================
+     * 按照 Renderer 实际单位屏幕位置
+     * 进行命中检测。
      */
 
     const zoom =
@@ -1816,13 +1791,7 @@ function findUnitAtMouse(event) {
         );
 
 
-    /*
-     * 倒序检查。
-     *
-     * 如果两个单位视觉上重叠，
-     * 优先选择后绘制的单位。
-     */
-
+    // 倒序检查，优先选择后绘制的单位
     for (
         let i = units.length - 1;
         i >= 0;
@@ -1837,7 +1806,7 @@ function findUnitAtMouse(event) {
 
 
         // ----------------------------------------------------
-        // Renderer.worldToScreen(q,r)
+        // Renderer.worldToScreen()
         // ----------------------------------------------------
 
         if (
@@ -1857,15 +1826,15 @@ function findUnitAtMouse(event) {
 
             catch (error) {
 
-                // 某些 Renderer 的 worldToScreen
-                // 需要 world pixel，而不是 q/r。
+                // 接口参数可能不同，继续尝试后备方案
+
             }
 
         }
 
 
         // ----------------------------------------------------
-        // Renderer.hexToScreen(q,r)
+        // Renderer.hexToScreen()
         // ----------------------------------------------------
 
         if (
@@ -1887,6 +1856,7 @@ function findUnitAtMouse(event) {
             catch (error) {
 
                 // 忽略，继续后备方案
+
             }
 
         }
@@ -1930,11 +1900,9 @@ function findUnitAtMouse(event) {
 
 
     /*
-     * ========================================================
      * 最后的后备方案：
      *
      * Hex 命中。
-     * ========================================================
      */
 
     const hex =
@@ -1956,8 +1924,6 @@ function findUnitAtMouse(event) {
     );
 
 }
-
-
 // ============================================================
 // 获取移动范围数据
 // ============================================================
@@ -2067,7 +2033,7 @@ function getMovementCost(data) {
 
     if (
         Number.isFinite(
-            data.cost
+            Number(data.cost)
         )
     ) {
 
@@ -2080,7 +2046,7 @@ function getMovementCost(data) {
 
     if (
         Number.isFinite(
-            data.totalCost
+            Number(data.totalCost)
         )
     ) {
 
@@ -2093,7 +2059,7 @@ function getMovementCost(data) {
 
     if (
         Number.isFinite(
-            data.distance
+            Number(data.distance)
         )
     ) {
 
@@ -2106,7 +2072,7 @@ function getMovementCost(data) {
 
     if (
         Number.isFinite(
-            data.apCost
+            Number(data.apCost)
         )
     ) {
 
@@ -2145,6 +2111,10 @@ function spendAP(
         );
 
 
+    // --------------------------------------------------------
+    // 优先交给 TurnSystem
+    // --------------------------------------------------------
+
     if (
         turnSystem &&
         typeof turnSystem.registerMove ===
@@ -2157,6 +2127,22 @@ function spendAP(
                 unit,
                 cost
             );
+
+
+            /*
+             * TurnSystem 如果负责 AP，
+             * 同步 MovementSystem 使用的 movementPoints。
+             */
+
+            const currentAP =
+                getUnitAP(
+                    unit
+                );
+
+
+            unit.movementPoints =
+                currentAP;
+
 
             return;
 
@@ -2173,6 +2159,10 @@ function spendAP(
 
     }
 
+
+    // --------------------------------------------------------
+    // 本地 AP
+    // --------------------------------------------------------
 
     const currentAP =
         getUnitAP(
@@ -2218,6 +2208,11 @@ function spendAP(
 
     }
 
+
+    // MovementSystem 同步
+    unit.movementPoints =
+        newAP;
+
 }
 
 
@@ -2237,6 +2232,20 @@ function canSpendAP(
     }
 
 
+    const cost =
+        Number(amount);
+
+
+    if (
+        !Number.isFinite(cost) ||
+        cost < 0
+    ) {
+
+        return false;
+
+    }
+
+
     if (
         turnSystem &&
         typeof turnSystem.canSpendAP ===
@@ -2247,7 +2256,7 @@ function canSpendAP(
 
             return turnSystem.canSpendAP(
                 unit,
-                amount
+                cost
             );
 
         }
@@ -2266,7 +2275,7 @@ function canSpendAP(
 
     return (
         getUnitAP(unit) >=
-        Number(amount)
+        cost
     );
 
 }
@@ -2287,6 +2296,10 @@ function tryMoveSelectedUnit(
 
     }
 
+
+    // --------------------------------------------------------
+    // 玩家是否有权控制
+    // --------------------------------------------------------
 
     if (
         !playerCanControlUnit(
@@ -2319,7 +2332,7 @@ function tryMoveSelectedUnit(
 
 
     // --------------------------------------------------------
-    // 目标格已经有单位
+    // 目标格是否已经存在单位
     // --------------------------------------------------------
 
     const occupyingUnit =
@@ -2335,10 +2348,18 @@ function tryMoveSelectedUnit(
     ) {
 
         /*
-         * V0.6 暂时不执行攻击。
+         * V0.6：
          *
-         * 后面 CombatSystem 接在这里。
+         * 这里暂时不直接执行攻击。
+         *
+         * 后续 CombatSystem 可以接在这里。
          */
+
+        console.log(
+            "目标格存在单位：",
+            occupyingUnit
+        );
+
 
         return false;
 
@@ -2346,7 +2367,7 @@ function tryMoveSelectedUnit(
 
 
     // --------------------------------------------------------
-    // 获取移动范围
+    // 读取可移动范围
     // --------------------------------------------------------
 
     const reachableData =
@@ -2366,7 +2387,7 @@ function tryMoveSelectedUnit(
 
 
     // --------------------------------------------------------
-    // 移动成本
+    // 获取移动成本
     // --------------------------------------------------------
 
     const movementCost =
@@ -2379,13 +2400,19 @@ function tryMoveSelectedUnit(
         movementCost == null
     ) {
 
+        console.warn(
+            "无法读取目标格移动成本：",
+            reachableData
+        );
+
+
         return false;
 
     }
 
 
     // --------------------------------------------------------
-    // AP
+    // AP 检查
     // --------------------------------------------------------
 
     if (
@@ -2395,18 +2422,45 @@ function tryMoveSelectedUnit(
         )
     ) {
 
+        console.log(
+            "行动点不足"
+        );
+
+
         return false;
 
     }
 
 
     // --------------------------------------------------------
-    // 尝试让 MovementSystem 执行移动
+    // 保存原坐标
+    // --------------------------------------------------------
+
+    const oldQ =
+        Number(
+            selectedUnit.q
+        );
+
+
+    const oldR =
+        Number(
+            selectedUnit.r
+        );
+
+
+    // --------------------------------------------------------
+    // 尝试使用 MovementSystem 执行移动
     // --------------------------------------------------------
 
     let movedBySystem =
         false;
 
+
+    /*
+     * 兼容：
+     *
+     * moveUnit(unit,q,r,units)
+     */
 
     if (
         typeof movementSystem.moveUnit ===
@@ -2431,7 +2485,7 @@ function tryMoveSelectedUnit(
 
             /*
              * 只要没有明确返回 false，
-             * 就认为系统完成了移动。
+             * 就认为 MovementSystem 接受了移动。
              */
 
             if (
@@ -2448,7 +2502,57 @@ function tryMoveSelectedUnit(
         catch (error) {
 
             console.warn(
-                "MovementSystem.moveUnit() 调用失败，使用 main.js 移动：",
+                "MovementSystem.moveUnit() 调用失败：",
+                error
+            );
+
+        }
+
+    }
+
+
+    /*
+     * 兼容：
+     *
+     * moveTo(unit,q,r,units)
+     */
+
+    else if (
+        typeof movementSystem.moveTo ===
+        "function"
+    ) {
+
+        try {
+
+            const result =
+                movementSystem.moveTo(
+
+                    selectedUnit,
+
+                    q,
+
+                    r,
+
+                    units
+
+                );
+
+
+            if (
+                result !== false
+            ) {
+
+                movedBySystem =
+                    true;
+
+            }
+
+        }
+
+        catch (error) {
+
+            console.warn(
+                "MovementSystem.moveTo() 调用失败：",
                 error
             );
 
@@ -2458,7 +2562,8 @@ function tryMoveSelectedUnit(
 
 
     // --------------------------------------------------------
-    // 本地移动
+    // 如果 MovementSystem 没有移动接口，
+    // main.js 自己更新单位坐标
     // --------------------------------------------------------
 
     if (!movedBySystem) {
@@ -2473,7 +2578,36 @@ function tryMoveSelectedUnit(
 
 
     // --------------------------------------------------------
-    // AP
+    // 检查最终位置
+    // --------------------------------------------------------
+
+    const positionChanged =
+
+        Number(selectedUnit.q) !== oldQ ||
+
+        Number(selectedUnit.r) !== oldR;
+
+
+    /*
+     * 某些 MovementSystem 返回成功，
+     * 但没有直接修改 unit.q / unit.r。
+     *
+     * 此时 main.js 补上坐标更新。
+     */
+
+    if (!positionChanged) {
+
+        selectedUnit.q =
+            Number(q);
+
+        selectedUnit.r =
+            Number(r);
+
+    }
+
+
+    // --------------------------------------------------------
+    // 消耗 AP
     // --------------------------------------------------------
 
     spendAP(
@@ -2483,7 +2617,7 @@ function tryMoveSelectedUnit(
 
 
     // --------------------------------------------------------
-    // 保持选择状态
+    // 保持单位选择状态
     // --------------------------------------------------------
 
     syncSelectedUnit(
@@ -2492,7 +2626,7 @@ function tryMoveSelectedUnit(
 
 
     // --------------------------------------------------------
-    // 重新计算移动范围
+    // 根据剩余 AP 重新计算移动范围
     // --------------------------------------------------------
 
     calculateReachable(
@@ -2501,7 +2635,7 @@ function tryMoveSelectedUnit(
 
 
     // --------------------------------------------------------
-    // 更新信息
+    // 更新右侧单位信息
     // --------------------------------------------------------
 
     showUnitInfo(
@@ -2509,7 +2643,23 @@ function tryMoveSelectedUnit(
     );
 
 
+    // --------------------------------------------------------
+    // 重绘
+    // --------------------------------------------------------
+
     render();
+
+
+    console.log(
+        "单位移动：",
+        `${oldQ},${oldR}`,
+        "→",
+        `${selectedUnit.q},${selectedUnit.r}`,
+        "成本：",
+        movementCost,
+        "剩余AP：",
+        getUnitAP(selectedUnit)
+    );
 
 
     return true;
@@ -2595,10 +2745,11 @@ window.addEventListener(
 
 
         /*
-         * 只有真正进入拖动状态后才移动地图。
+         * 只有真正进入拖动状态以后，
+         * 才移动地图。
          *
-         * 这样普通点击单位时的小幅鼠标抖动
-         * 不会导致 click 被取消。
+         * 这样普通点击单位时轻微的鼠标抖动
+         * 不会取消 click。
          */
 
         if (dragMoved) {
@@ -2703,6 +2854,27 @@ window.addEventListener(
 
 
 // ============================================================
+// 鼠标离开窗口时停止拖动
+// ============================================================
+
+window.addEventListener(
+
+    "blur",
+
+    () => {
+
+        isDragging =
+            false;
+
+        dragMoved =
+            false;
+
+    }
+
+);
+
+
+// ============================================================
 // 点击地图
 // ============================================================
 
@@ -2713,7 +2885,7 @@ canvas.addEventListener(
     event => {
 
         // ----------------------------------------------------
-        // 如果刚才是拖动，不执行点击
+        // 如果刚才发生了拖动，不执行点击
         // ----------------------------------------------------
 
         if (dragMoved) {
@@ -2757,7 +2929,7 @@ canvas.addEventListener(
 
 
         // ----------------------------------------------------
-        // 第二优先级：移动
+        // 第二优先级：点击可移动格
         // ----------------------------------------------------
 
         if (selectedUnit) {
@@ -2784,7 +2956,7 @@ canvas.addEventListener(
 
 
         // ----------------------------------------------------
-        // 空白区域
+        // 点击普通空白区域
         // ----------------------------------------------------
 
         clearSelection();
@@ -3036,53 +3208,97 @@ function endCurrentPhase() {
 
     if (!turnSystem) {
 
+        console.warn(
+            "TurnSystem 尚未初始化"
+        );
+
         return;
 
     }
 
 
+    // --------------------------------------------------------
+    // 清除当前选择
+    // --------------------------------------------------------
+
     clearSelection();
 
+
+    // --------------------------------------------------------
+    // 优先使用 TurnSystem.endPhase()
+    // --------------------------------------------------------
 
     if (
         typeof turnSystem.endPhase ===
         "function"
     ) {
 
-        turnSystem.endPhase();
+        try {
+
+            turnSystem.endPhase();
+
+        }
+
+        catch (error) {
+
+            console.error(
+                "TurnSystem.endPhase() 执行失败：",
+                error
+            );
+
+            return;
+
+        }
 
     }
 
-    else {
 
-        /*
-         * TurnSystem 没有 endPhase 时的后备方案。
-         */
+    // --------------------------------------------------------
+    // 后备阶段切换
+    // --------------------------------------------------------
+
+    else {
 
         const current =
             getCurrentPhase();
 
 
-        turnSystem.phase =
-
-            current === "german"
-
-                ? "soviet"
-
-                : "german";
-
-
         if (
-            current === "soviet"
+            current === "german"
         ) {
 
+            turnSystem.phase =
+                "soviet";
+
+        }
+
+        else {
+
+            turnSystem.phase =
+                "german";
+
+
+            // 苏军行动结束后进入下一回合
             if (
                 Number.isFinite(
-                    turnSystem.turn
+                    Number(turnSystem.turn)
                 )
             ) {
 
-                turnSystem.turn +=
+                turnSystem.turn =
+                    Number(turnSystem.turn) +
+                    1;
+
+            }
+
+            else if (
+                Number.isFinite(
+                    Number(turnSystem.turnNumber)
+                )
+            ) {
+
+                turnSystem.turnNumber =
+                    Number(turnSystem.turnNumber) +
                     1;
 
             }
@@ -3092,9 +3308,19 @@ function endCurrentPhase() {
     }
 
 
+    // --------------------------------------------------------
+    // UI
+    // --------------------------------------------------------
+
     updateTurnUI();
 
     render();
+
+
+    console.log(
+        "阶段结束，当前行动方：",
+        getCurrentPhase()
+    );
 
 }
 
@@ -3131,7 +3357,7 @@ window.addEventListener(
     event => {
 
         // ----------------------------------------------------
-        // ESC
+        // ESC：取消选择
         // ----------------------------------------------------
 
         if (
@@ -3149,7 +3375,7 @@ window.addEventListener(
 
 
         // ----------------------------------------------------
-        // E
+        // E：结束当前行动阶段
         // ----------------------------------------------------
 
         if (
@@ -3164,283 +3390,8 @@ window.addEventListener(
     }
 
 );
-
-
 // ============================================================
-// 玩家选择阵营之后
-// ============================================================
-
-function startGame(
-    selectedFaction = null
-) {
-
-    console.log(
-        "选择阵营：",
-        selectedFaction
-    );
-
-
-    console.log(
-        "玩家阵营：",
-        getPlayerSide()
-    );
-
-
-    console.log(
-        "游戏模式：",
-        gameState.mode
-    );
-
-
-    clearSelection();
-
-    updateTurnUI();
-
-    resizeCanvas();
-
-    render();
-
-}
-
-
-// ============================================================
-// 从 Scenario 提取单位
-// ============================================================
-
-function extractUnitsFromScenario(
-    data
-) {
-
-    if (!data) {
-
-        return [];
-
-    }
-
-
-    // --------------------------------------------------------
-    // scenario.units
-    // --------------------------------------------------------
-
-    if (
-        Array.isArray(
-            data.units
-        )
-    ) {
-
-        return data.units;
-
-    }
-
-
-    // --------------------------------------------------------
-    // scenario 本身就是数组
-    // --------------------------------------------------------
-
-    if (
-        Array.isArray(
-            data
-        )
-    ) {
-
-        return data;
-
-    }
-
-
-    // --------------------------------------------------------
-    // 德军
-    // --------------------------------------------------------
-
-    const germanUnits =
-
-        data.german?.units ??
-        data.axis?.units ??
-        data.GER?.units ??
-        [];
-
-
-    // --------------------------------------------------------
-    // 苏军
-    // --------------------------------------------------------
-
-    const sovietUnits =
-
-        data.soviet?.units ??
-        data.ussr?.units ??
-        data.USSR?.units ??
-        [];
-
-
-    return [
-
-        ...germanUnits,
-
-        ...sovietUnits
-
-    ];
-
-}
-
-
-// ============================================================
-// 加载场景
-// ============================================================
-
-async function loadScenario() {
-
-    try {
-
-        // ----------------------------------------------------
-        // Scenario
-        // ----------------------------------------------------
-
-        const response =
-            await fetch(
-                "./data/scenario.json"
-            );
-
-
-        if (!response.ok) {
-
-            throw new Error(
-
-                `scenario.json 加载失败：${response.status}`
-
-            );
-
-        }
-
-
-        scenario =
-            await response.json();
-
-
-        // ----------------------------------------------------
-        // 单位
-        // ----------------------------------------------------
-
-        units =
-            extractUnitsFromScenario(
-                scenario
-            );
-
-
-        console.log(
-            "场景读取完成"
-        );
-
-
-        console.log(
-            "单位数量：",
-            units.length
-        );
-
-
-        // ----------------------------------------------------
-        // 初始化单位
-        // ----------------------------------------------------
-
-        initializeUnits();
-
-
-        // ----------------------------------------------------
-        // 初始化回合
-        // ----------------------------------------------------
-
-        initializeTurnSystem();
-
-
-        // ----------------------------------------------------
-        // Canvas
-        // ----------------------------------------------------
-
-        resizeCanvas();
-
-
-        // ----------------------------------------------------
-        // 初始渲染
-        // ----------------------------------------------------
-
-        render();
-
-
-        // ----------------------------------------------------
-        // 阵营选择
-        //
-        // 必须传 startGame
-        // 防止之前的 onStart is not a function
-        // ----------------------------------------------------
-
-        if (
-            typeof factionSelection.show ===
-            "function"
-        ) {
-
-            factionSelection.show(
-                startGame
-            );
-
-        }
-
-        else {
-
-            startGame();
-
-        }
-
-
-        console.log(
-            "东线 1941 V0.6 已启动"
-        );
-
-
-        if (
-            turnSystem &&
-            typeof turnSystem.getState ===
-            "function"
-        ) {
-
-            console.log(
-                "回合状态：",
-                turnSystem.getState()
-            );
-
-        }
-
-    }
-
-    catch (error) {
-
-        console.error(
-            "游戏初始化失败：",
-            error
-        );
-
-
-        if (unitInfo) {
-
-            unitInfo.innerHTML = `
-
-                <strong>
-                    游戏数据加载失败
-                </strong>
-
-                <br><br>
-
-                ${error.message}
-
-            `;
-
-        }
-
-    }
-
-}
-
-
-// ============================================================
-// 窗口大小变化
+// 窗口尺寸变化
 // ============================================================
 
 window.addEventListener(
@@ -3459,64 +3410,1056 @@ window.addEventListener(
 
 
 // ============================================================
-// 调试接口
-//
-// 在浏览器 Console 可以输入：
-//
-// dubno.units
-// dubno.selectedUnit
-// dubno.camera
-//
-// 方便后续开发。
+// 从场景对象提取单位
 // ============================================================
 
-window.dubno = {
+function extractUnitsFromScenario(data) {
 
-    get units() {
+    if (!data) {
 
-        return units;
+        return [];
 
-    },
-
-
-    get selectedUnit() {
-
-        return selectedUnit;
-
-    },
+    }
 
 
-    get turnSystem() {
+    // --------------------------------------------------------
+    // 标准格式：
+    //
+    // {
+    //     units: [...]
+    // }
+    // --------------------------------------------------------
 
-        return turnSystem;
+    if (
+        Array.isArray(
+            data.units
+        )
+    ) {
 
-    },
+        return data.units;
 
-
-    camera,
-
-    renderer,
-
-    selection,
-
-    movementSystem,
-
-    gameState,
+    }
 
 
-    selectUnit,
+    // --------------------------------------------------------
+    // 双方分开保存
+    //
+    // {
+    //     germanUnits: [...],
+    //     sovietUnits: [...]
+    // }
+    // --------------------------------------------------------
 
-    clearSelection,
+    const result = [];
 
-    render
 
-};
+    if (
+        Array.isArray(
+            data.germanUnits
+        )
+    ) {
+
+        for (
+            const unit of
+            data.germanUnits
+        ) {
+
+            result.push({
+
+                ...unit,
+
+                side:
+                    unit.side ??
+                    unit.faction ??
+                    "german"
+
+            });
+
+        }
+
+    }
+
+
+    if (
+        Array.isArray(
+            data.sovietUnits
+        )
+    ) {
+
+        for (
+            const unit of
+            data.sovietUnits
+        ) {
+
+            result.push({
+
+                ...unit,
+
+                side:
+                    unit.side ??
+                    unit.faction ??
+                    "soviet"
+
+            });
+
+        }
+
+    }
+
+
+    // --------------------------------------------------------
+    // factions 格式
+    // --------------------------------------------------------
+
+    if (
+        result.length === 0 &&
+        data.factions
+    ) {
+
+        const german =
+
+            data.factions.german ??
+            data.factions.GER ??
+            data.factions.axis;
+
+
+        const soviet =
+
+            data.factions.soviet ??
+            data.factions.USSR ??
+            data.factions.redArmy;
+
+
+        if (
+            Array.isArray(
+                german
+            )
+        ) {
+
+            for (
+                const unit of german
+            ) {
+
+                result.push({
+
+                    ...unit,
+
+                    side:
+                        unit.side ??
+                        unit.faction ??
+                        "german"
+
+                });
+
+            }
+
+        }
+
+
+        else if (
+            Array.isArray(
+                german?.units
+            )
+        ) {
+
+            for (
+                const unit of
+                german.units
+            ) {
+
+                result.push({
+
+                    ...unit,
+
+                    side:
+                        unit.side ??
+                        unit.faction ??
+                        "german"
+
+                });
+
+            }
+
+        }
+
+
+        if (
+            Array.isArray(
+                soviet
+            )
+        ) {
+
+            for (
+                const unit of soviet
+            ) {
+
+                result.push({
+
+                    ...unit,
+
+                    side:
+                        unit.side ??
+                        unit.faction ??
+                        "soviet"
+
+                });
+
+            }
+
+        }
+
+
+        else if (
+            Array.isArray(
+                soviet?.units
+            )
+        ) {
+
+            for (
+                const unit of
+                soviet.units
+            ) {
+
+                result.push({
+
+                    ...unit,
+
+                    side:
+                        unit.side ??
+                        unit.faction ??
+                        "soviet"
+
+                });
+
+            }
+
+        }
+
+    }
+
+
+    return result;
+
+}
+
+
+// ============================================================
+// 场景加载
+// ============================================================
+
+async function loadScenario() {
+
+    /*
+     * 项目不同阶段可能使用过不同场景文件名。
+     *
+     * 依次尝试，成功一个即可。
+     */
+
+    const candidates = [
+
+        "./data/scenarios/dubno_1941.json",
+
+        "./data/dubno_1941.json",
+
+        "./data/scenario.json",
+
+        "./scenario.json"
+
+    ];
+
+
+    let lastError =
+        null;
+
+
+    for (
+        const url of candidates
+    ) {
+
+        try {
+
+            const response =
+                await fetch(
+                    url
+                );
+
+
+            if (!response.ok) {
+
+                continue;
+
+            }
+
+
+            const data =
+                await response.json();
+
+
+            console.log(
+                "场景加载成功：",
+                url
+            );
+
+
+            return data;
+
+        }
+
+        catch (error) {
+
+            lastError =
+                error;
+
+        }
+
+    }
+
+
+    if (lastError) {
+
+        console.warn(
+            "外部场景文件加载失败：",
+            lastError
+        );
+
+    }
+
+
+    /*
+     * 如果你的单位本来由其他模块注入，
+     * 返回 null 而不是直接终止游戏。
+     */
+
+    return null;
+
+}
+
+
+// ============================================================
+// 默认测试单位
+// ============================================================
+
+function createFallbackUnits() {
+
+    /*
+     * 只有在场景完全没有单位时才会使用。
+     *
+     * 正常游戏不会进入这里。
+     */
+
+    return [
+
+        {
+            id: "GER_INF_01",
+            name: "第1步兵团",
+            nameZh: "第1步兵团",
+            type: "infantry",
+            typeZh: "步兵",
+            side: "german",
+            faction: "GER",
+            q: 11,
+            r: 14,
+
+            actionPoints: 6,
+            maxActionPoints: 6,
+
+            movementPoints: 6,
+            maxMovementPoints: 6,
+
+            morale: 80,
+            suppression: 0,
+            fatigue: 0,
+            ammunition: 100
+        },
+
+
+        {
+            id: "GER_ARM_01",
+            name: "第1装甲团",
+            nameZh: "第1装甲团",
+            type: "armor",
+            typeZh: "装甲",
+            side: "german",
+            faction: "GER",
+            q: 14,
+            r: 12,
+
+            actionPoints: 8,
+            maxActionPoints: 8,
+
+            movementPoints: 8,
+            maxMovementPoints: 8,
+
+            morale: 85,
+            suppression: 0,
+            fatigue: 0,
+            ammunition: 100
+        },
+
+
+        {
+            id: "USSR_INF_01",
+            name: "苏军步兵第1团",
+            nameZh: "苏军步兵第1团",
+            type: "infantry",
+            typeZh: "步兵",
+            side: "soviet",
+            faction: "USSR",
+            q: 31,
+            r: 17,
+
+            actionPoints: 6,
+            maxActionPoints: 6,
+
+            movementPoints: 6,
+            maxMovementPoints: 6,
+
+            morale: 75,
+            suppression: 0,
+            fatigue: 0,
+            ammunition: 100
+        },
+
+
+        {
+            id: "USSR_ARM_01",
+            name: "苏军坦克第1团",
+            nameZh: "苏军坦克第1团",
+            type: "armor",
+            typeZh: "装甲",
+            side: "soviet",
+            faction: "USSR",
+            q: 34,
+            r: 15,
+
+            actionPoints: 8,
+            maxActionPoints: 8,
+
+            movementPoints: 8,
+            maxMovementPoints: 8,
+
+            morale: 80,
+            suppression: 0,
+            fatigue: 0,
+            ammunition: 100
+        }
+
+    ];
+
+}
+
+
+// ============================================================
+// 设置场景
+// ============================================================
+
+function applyScenario(data) {
+
+    scenario =
+        data;
+
+
+    let loadedUnits =
+        extractUnitsFromScenario(
+            data
+        );
+
+
+    // --------------------------------------------------------
+    // 如果场景数据本身就是数组
+    // --------------------------------------------------------
+
+    if (
+        loadedUnits.length === 0 &&
+        Array.isArray(data)
+    ) {
+
+        loadedUnits =
+            data;
+
+    }
+
+
+    // --------------------------------------------------------
+    // 如果 Renderer / WorldMap 已经预装单位
+    // --------------------------------------------------------
+
+    if (
+        loadedUnits.length === 0 &&
+        Array.isArray(world.units)
+    ) {
+
+        loadedUnits =
+            world.units;
+
+    }
+
+
+    // --------------------------------------------------------
+    // 最终后备
+    // --------------------------------------------------------
+
+    if (
+        loadedUnits.length === 0
+    ) {
+
+        console.warn(
+            "没有从场景中读取到单位，使用默认测试单位"
+        );
+
+
+        loadedUnits =
+            createFallbackUnits();
+
+    }
+
+
+    units =
+        loadedUnits;
+
+
+    initializeUnits();
+
+
+    // --------------------------------------------------------
+    // 同步 Renderer
+    // --------------------------------------------------------
+
+    renderer.units =
+        units;
+
+
+    renderer.world =
+        world;
+
+
+    renderer.camera =
+        camera;
+
+
+    renderer.movementSystem =
+        movementSystem;
+
+
+    renderer.selection =
+        selection;
+
+
+    // --------------------------------------------------------
+    // 同步 UnitSelection
+    // --------------------------------------------------------
+
+    selection.units =
+        units;
+
+
+    // --------------------------------------------------------
+    // 同步 GameState
+    // --------------------------------------------------------
+
+    gameState.units =
+        units;
+
+
+    console.log(
+        "单位初始化完成：",
+        units.length
+    );
+
+}
+
+
+// ============================================================
+// 相机初始位置
+// ============================================================
+
+function initializeCamera() {
+
+    /*
+     * 如果 Camera 自己提供 fitToMap，
+     * 优先使用。
+     */
+
+    if (
+        typeof camera.fitToMap ===
+        "function"
+    ) {
+
+        try {
+
+            camera.fitToMap(
+
+                world,
+
+                canvas.width,
+
+                canvas.height
+
+            );
+
+
+            return;
+
+        }
+
+        catch (error) {
+
+            console.warn(
+                "camera.fitToMap() 调用失败：",
+                error
+            );
+
+        }
+
+    }
+
+
+    /*
+     * 不强行覆盖 Camera 已经存在的默认值。
+     */
+
+    if (
+        camera.zoom == null ||
+        !Number.isFinite(
+            Number(camera.zoom)
+        )
+    ) {
+
+        camera.zoom =
+            1;
+
+    }
+
+
+    if (
+        "x" in camera &&
+        !Number.isFinite(
+            Number(camera.x)
+        )
+    ) {
+
+        camera.x =
+            0;
+
+    }
+
+
+    if (
+        "y" in camera &&
+        !Number.isFinite(
+            Number(camera.y)
+        )
+    ) {
+
+        camera.y =
+            0;
+
+    }
+
+
+    if (
+        "offsetX" in camera &&
+        !Number.isFinite(
+            Number(camera.offsetX)
+        )
+    ) {
+
+        camera.offsetX =
+            0;
+
+    }
+
+
+    if (
+        "offsetY" in camera &&
+        !Number.isFinite(
+            Number(camera.offsetY)
+        )
+    ) {
+
+        camera.offsetY =
+            0;
+
+    }
+
+}
+
+
+// ============================================================
+// 玩家选择阵营后开始游戏
+// ============================================================
+
+function startGame() {
+
+    clearSelection();
+
+
+    updateTurnUI();
+
+
+    render();
+
+
+    console.log(
+        "游戏开始"
+    );
+
+
+    console.log(
+        "玩家阵营：",
+        getPlayerSide()
+    );
+
+
+    console.log(
+        "当前行动方：",
+        getCurrentPhase()
+    );
+
+}
+
+
+// ============================================================
+// 显示阵营选择
+// ============================================================
+
+function showFactionSelection() {
+
+    if (
+        !factionSelection ||
+        typeof factionSelection.show !==
+        "function"
+    ) {
+
+        console.warn(
+            "FactionSelection 不可用，直接进入游戏"
+        );
+
+
+        startGame();
+
+        return;
+
+    }
+
+
+    factionSelection.show(
+
+        () => {
+
+            startGame();
+
+        }
+
+    );
+
+}
+
+
+// ============================================================
+// 初始化游戏
+// ============================================================
+
+async function initializeGame() {
+
+    console.log(
+        "正在初始化《东线 1941：杜布诺》..."
+    );
+
+
+    // --------------------------------------------------------
+    // Canvas
+    // --------------------------------------------------------
+
+    resizeCanvas();
+
+
+    // --------------------------------------------------------
+    // 场景
+    // --------------------------------------------------------
+
+    let loadedScenario =
+        null;
+
+
+    try {
+
+        loadedScenario =
+            await loadScenario();
+
+    }
+
+    catch (error) {
+
+        console.error(
+            "场景加载出现异常：",
+            error
+        );
+
+    }
+
+
+    // --------------------------------------------------------
+    // 应用场景
+    // --------------------------------------------------------
+
+    applyScenario(
+        loadedScenario
+    );
+
+
+    // --------------------------------------------------------
+    // 相机
+    // --------------------------------------------------------
+
+    initializeCamera();
+
+
+    // --------------------------------------------------------
+    // 回合系统
+    // --------------------------------------------------------
+
+    initializeTurnSystem();
+
+
+    // --------------------------------------------------------
+    // 初始渲染
+    // --------------------------------------------------------
+
+    render();
+
+
+    // --------------------------------------------------------
+    // 阵营选择
+    // --------------------------------------------------------
+
+    showFactionSelection();
+
+
+    console.log(
+        "初始化完成"
+    );
+
+}
 
 
 // ============================================================
 // 启动
 // ============================================================
 
-resizeCanvas();
+initializeGame()
+    .catch(
 
-loadScenario();
+        error => {
+
+            console.error(
+                "游戏初始化失败：",
+                error
+            );
+
+
+            if (unitInfo) {
+
+                unitInfo.innerHTML = `
+
+                    <div class="unit-title">
+                        游戏初始化失败
+                    </div>
+
+                    <p>
+                        请打开浏览器开发者工具查看错误信息。
+                    </p>
+
+                `;
+
+            }
+
+        }
+
+    );
+
+
+// ============================================================
+// 开发调试接口
+// ============================================================
+
+window.EasternFront1941 = {
+
+    // --------------------------------------------------------
+    // 核心对象
+    // --------------------------------------------------------
+
+    world,
+
+    camera,
+
+    renderer,
+
+    gameState,
+
+    selection,
+
+    movementSystem,
+
+
+    // --------------------------------------------------------
+    // 获取游戏数据
+    // --------------------------------------------------------
+
+    getUnits() {
+
+        return units;
+
+    },
+
+
+    getSelectedUnit() {
+
+        return selectedUnit;
+
+    },
+
+
+    getTurnSystem() {
+
+        return turnSystem;
+
+    },
+
+
+    getScenario() {
+
+        return scenario;
+
+    },
+
+
+    // --------------------------------------------------------
+    // 手动渲染
+    // --------------------------------------------------------
+
+    render() {
+
+        render();
+
+    },
+
+
+    // --------------------------------------------------------
+    // 手动结束阶段
+    // --------------------------------------------------------
+
+    endPhase() {
+
+        endCurrentPhase();
+
+    },
+
+
+    // --------------------------------------------------------
+    // 手动清除选择
+    // --------------------------------------------------------
+
+    clearSelection() {
+
+        clearSelection();
+
+        render();
+
+    },
+
+
+    // --------------------------------------------------------
+    // 手动选择单位
+    // --------------------------------------------------------
+
+    selectUnitById(id) {
+
+        const unit =
+            units.find(
+
+                item =>
+                    String(item.id) ===
+                    String(id)
+
+            );
+
+
+        if (!unit) {
+
+            console.warn(
+                "找不到单位：",
+                id
+            );
+
+
+            return null;
+
+        }
+
+
+        selectUnit(
+            unit
+        );
+
+
+        return unit;
+
+    },
+
+
+    // --------------------------------------------------------
+    // 手动计算移动范围
+    // --------------------------------------------------------
+
+    calculateReachable(id) {
+
+        const unit =
+            units.find(
+
+                item =>
+                    String(item.id) ===
+                    String(id)
+
+            );
+
+
+        if (!unit) {
+
+            console.warn(
+                "找不到单位：",
+                id
+            );
+
+
+            return null;
+
+        }
+
+
+        calculateReachable(
+            unit
+        );
+
+
+        render();
+
+
+        return (
+            movementSystem.reachable ??
+            movementSystem.reachableHexes ??
+            null
+        );
+
+    }
+
+};
+
+
+// ============================================================
+// 完成
+// ============================================================
+
+console.log(
+    "main.js 已加载"
+);
