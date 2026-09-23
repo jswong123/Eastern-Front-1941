@@ -8,6 +8,16 @@ import {
 } from "./Renderer.js";
 
 
+import {
+    Camera
+} from "./Camera.js";
+
+
+import {
+    UnitSelection
+} from "./UnitSelection.js";
+
+
 const canvas =
     document.getElementById(
         "gameCanvas"
@@ -24,6 +34,10 @@ const world =
     new WorldMap();
 
 
+const camera =
+    new Camera();
+
+
 const renderer =
     new Renderer(
         canvas,
@@ -31,17 +45,44 @@ const renderer =
     );
 
 
+/*
+ * Renderer V0.1 原本自己保存 camera。
+ *
+ * V0.2 开始把 Camera 独立成模块。
+ */
+
+renderer.camera =
+    camera;
+
+
+const selection =
+    new UnitSelection(
+        renderer,
+        unitInfo
+    );
+
+
 let units = [];
 
 
-let dragging = false;
+/*
+ * 用来区分：
+ *
+ * 点击单位
+ *
+ * 和
+ *
+ * 拖动地图
+ */
 
-let lastMouseX = 0;
-let lastMouseY = 0;
+let mouseDownX = 0;
+let mouseDownY = 0;
+
+let movedDuringDrag = false;
 
 
 /*
- * 加载战役
+ * 加载场景
  */
 
 async function loadScenario() {
@@ -68,7 +109,7 @@ async function loadScenario() {
 
 
         units =
-            data.units || [];
+            data.units ?? [];
 
 
         render();
@@ -83,8 +124,15 @@ async function loadScenario() {
 
 
         unitInfo.innerHTML = `
-            <strong>战役加载失败</strong>
-            <p>${error.message}</p>
+
+            <strong>
+                战役加载失败
+            </strong>
+
+            <p>
+                ${error.message}
+            </p>
+
         `;
 
     }
@@ -93,7 +141,7 @@ async function loadScenario() {
 
 
 /*
- * 渲染
+ * 主渲染
  */
 
 function render() {
@@ -101,6 +149,74 @@ function render() {
     renderer.render(
         units
     );
+
+
+    /*
+     * 给被选择的单位增加黄色框。
+     */
+
+    if (
+        selection.selectedUnit
+    ) {
+
+        drawSelection(
+            selection.selectedUnit
+        );
+
+    }
+
+}
+
+
+/*
+ * 选中框
+ */
+
+function drawSelection(unit) {
+
+    const position =
+        renderer.worldToScreen(
+            unit.q,
+            unit.r
+        );
+
+
+    const ctx =
+        renderer.ctx;
+
+
+    const size =
+        38 *
+        Math.max(
+            0.75,
+            camera.zoom
+        );
+
+
+    ctx.save();
+
+
+    ctx.strokeStyle =
+        "#f1d36a";
+
+
+    ctx.lineWidth = 3;
+
+
+    ctx.strokeRect(
+
+        position.x - size,
+
+        position.y - size * 0.72,
+
+        size * 2,
+
+        size * 1.44
+
+    );
+
+
+    ctx.restore();
 
 }
 
@@ -122,71 +238,163 @@ window.addEventListener(
 
 
 /*
- * 地图拖动
+ * 鼠标按下
  */
 
 canvas.addEventListener(
     "mousedown",
     event => {
 
-        dragging = true;
-
-        lastMouseX =
+        mouseDownX =
             event.clientX;
 
-        lastMouseY =
+
+        mouseDownY =
             event.clientY;
 
+
+        movedDuringDrag =
+            false;
+
+
+        camera.startDrag(
+            event.clientX,
+            event.clientY
+        );
+
     }
 );
 
 
-window.addEventListener(
-    "mouseup",
-    () => {
-
-        dragging = false;
-
-    }
-);
-
+/*
+ * 鼠标移动
+ */
 
 window.addEventListener(
     "mousemove",
     event => {
 
-        if (!dragging) {
+        if (
+            !camera.dragging
+        ) {
 
             return;
 
         }
 
 
-        const dx =
+        const totalDX =
             event.clientX -
-            lastMouseX;
+            mouseDownX;
 
 
-        const dy =
+        const totalDY =
             event.clientY -
-            lastMouseY;
+            mouseDownY;
 
 
-        renderer.camera.x += dx;
-        renderer.camera.y += dy;
+        if (
+            Math.abs(totalDX) > 4 ||
+            Math.abs(totalDY) > 4
+        ) {
+
+            movedDuringDrag =
+                true;
+
+        }
 
 
-        lastMouseX =
-            event.clientX;
+        if (
+            camera.drag(
+                event.clientX,
+                event.clientY
+            )
+        ) {
 
-        lastMouseY =
-            event.clientY;
+            render();
 
-
-        render();
+        }
 
     }
 );
+
+
+/*
+ * 鼠标松开
+ */
+
+window.addEventListener(
+    "mouseup",
+    event => {
+
+        if (
+            !camera.dragging
+        ) {
+
+            return;
+
+        }
+
+
+        camera.endDrag();
+
+
+        /*
+         * 如果移动距离很小，
+         * 认为这是一次点击。
+         */
+
+        if (
+            !movedDuringDrag
+        ) {
+
+            handleMapClick(
+                event
+            );
+
+        }
+
+    }
+);
+
+
+/*
+ * 点击单位
+ */
+
+function handleMapClick(event) {
+
+    const rect =
+        canvas
+        .getBoundingClientRect();
+
+
+    const mouseX =
+        event.clientX -
+        rect.left;
+
+
+    const mouseY =
+        event.clientY -
+        rect.top;
+
+
+    const unit =
+        selection.findUnitAt(
+            mouseX,
+            mouseY,
+            units
+        );
+
+
+    selection.select(
+        unit
+    );
+
+
+    render();
+
+}
 
 
 /*
@@ -200,24 +408,9 @@ canvas.addEventListener(
         event.preventDefault();
 
 
-        const factor =
-            event.deltaY < 0
-                ? 1.1
-                : 0.9;
-
-
-        renderer.camera.zoom *=
-            factor;
-
-
-        renderer.camera.zoom =
-            Math.max(
-                0.45,
-                Math.min(
-                    2.2,
-                    renderer.camera.zoom
-                )
-            );
+        camera.changeZoom(
+            event.deltaY
+        );
 
 
         render();
@@ -231,7 +424,22 @@ canvas.addEventListener(
 
 
 /*
- * 全局错误保护
+ * 防止鼠标离开窗口后
+ * Camera 一直保持拖动状态。
+ */
+
+window.addEventListener(
+    "blur",
+    () => {
+
+        camera.endDrag();
+
+    }
+);
+
+
+/*
+ * 错误保护
  */
 
 window.addEventListener(
@@ -240,7 +448,8 @@ window.addEventListener(
 
         console.error(
             "游戏运行错误：",
-            event.error
+            event.error ??
+            event.message
         );
 
     }
@@ -259,5 +468,9 @@ window.addEventListener(
     }
 );
 
+
+/*
+ * 启动游戏
+ */
 
 loadScenario();
