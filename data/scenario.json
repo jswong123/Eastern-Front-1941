@@ -1,1 +1,141 @@
+{
+    "scenario": "Dubno 1941 Prototype",
 
+    "date": "1941-06-26",
+
+    "units": [
+
+        {
+            "id": "GER_PZ_01",
+
+            "side": "germany",
+
+            "type": "armor",
+
+            "level": "platoon",
+
+            "regiment": "装15",
+
+            "shortName": "1连1排",
+
+            "equipment": "Panzer III",
+
+            "operational": 5,
+
+            "maximum": 5,
+
+            "q": 13,
+            "r": 12
+        },
+
+        {
+            "id": "GER_INF_01",
+
+            "side": "germany",
+
+            "type": "infantry",
+
+            "level": "company",
+
+            "regiment": "步110",
+
+            "shortName": "第1连",
+
+            "personnel": 154,
+
+            "maximum": 162,
+
+            "q": 11,
+            "r": 14
+        },
+
+        {
+            "id": "GER_INF_02",
+
+            "side": "germany",
+
+            "type": "infantry",
+
+            "level": "company",
+
+            "regiment": "步110",
+
+            "shortName": "第2连",
+
+            "personnel": 147,
+
+            "maximum": 162,
+
+            "q": 12,
+            "r": 15
+        },
+
+        {
+            "id": "SOV_TANK_01",
+
+            "side": "soviet",
+
+            "type": "armor",
+
+            "level": "platoon",
+
+            "regiment": "坦86",
+
+            "shortName": "1连1排",
+
+            "equipment": "T-26",
+
+            "operational": 5,
+
+            "maximum": 5,
+
+            "q": 28,
+            "r": 13
+        },
+
+        {
+            "id": "SOV_INF_01",
+
+            "side": "soviet",
+
+            "type": "infantry",
+
+            "level": "company",
+
+            "regiment": "步XX",
+
+            "shortName": "第1连",
+
+            "personnel": 151,
+
+            "maximum": 160,
+
+            "q": 27,
+            "r": 15
+        },
+
+        {
+            "id": "SOV_ART_01",
+
+            "side": "soviet",
+
+            "type": "artillery",
+
+            "level": "platoon",
+
+            "regiment": "炮XX",
+
+            "shortName": "炮兵排",
+
+            "equipment": "76mm",
+
+            "operational": 4,
+
+            "maximum": 4,
+
+            "q": 30,
+            "r": 17
+        }
+
+    ]
+}
