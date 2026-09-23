@@ -1,317 +1,398 @@
-// ============================================================
+// ========================================
 // CombatSystem.js
-// 东线 1941
-// 基础战斗系统
-// ============================================================
+// 战斗系统
+// ========================================
 
 export class CombatSystem {
 
-    constructor() {
+    constructor(world) {
 
-        // 一次攻击消耗的行动点
-        this.attackAPCost = 2;
+        this.world = world;
+
     }
 
 
-    // ========================================================
+    // ========================================
     // 六角格距离
-    // ========================================================
+    // ========================================
 
-    hexDistance(a, b) {
+    getDistance(a, b) {
 
         if (!a || !b) {
             return Infinity;
         }
 
+
         const dq =
-            Number(a.q) -
-            Number(b.q);
+            a.q - b.q;
 
         const dr =
-            Number(a.r) -
-            Number(b.r);
+            a.r - b.r;
 
-        return (
-            Math.abs(dq) +
-            Math.abs(dr) +
+
+        return Math.max(
+
+            Math.abs(dq),
+
+            Math.abs(dr),
+
             Math.abs(dq + dr)
-        ) / 2;
-    }
 
-
-    // ========================================================
-    // 阵营
-    // ========================================================
-
-    getSide(unit) {
-
-        const value =
-            String(
-                unit?.side ??
-                unit?.faction ??
-                ""
-            )
-                .trim()
-                .toLowerCase();
-
-        if (
-            value === "ger" ||
-            value === "german" ||
-            value === "germany" ||
-            value === "axis"
-        ) {
-            return "german";
-        }
-
-        if (
-            value === "ussr" ||
-            value === "soviet" ||
-            value === "redarmy" ||
-            value === "red_army"
-        ) {
-            return "soviet";
-        }
-
-        return value;
-    }
-
-
-    // ========================================================
-    // 是否敌对
-    // ========================================================
-
-    isEnemy(a, b) {
-
-        if (!a || !b) {
-            return false;
-        }
-
-        return (
-            this.getSide(a) !==
-            this.getSide(b)
         );
+
     }
 
 
-    // ========================================================
-    // 属性读取
-    // ========================================================
-
-    getAP(unit) {
-
-        return Number(
-            unit?.actionPoints ??
-            unit?.ap ??
-            unit?.movementPoints ??
-            0
-        );
-    }
-
-
-    setAP(unit, value) {
-
-        const ap =
-            Math.max(
-                0,
-                Number(value) || 0
-            );
-
-        unit.actionPoints = ap;
-        unit.ap = ap;
-        unit.movementPoints = ap;
-    }
-
-
-    getStrength(unit) {
-
-        return Number(
-            unit?.strength ??
-            unit?.personnel ??
-            unit?.men ??
-            100
-        );
-    }
-
-
-    getMaxStrength(unit) {
-
-        return Number(
-            unit?.maxStrength ??
-            unit?.maxPersonnel ??
-            unit?.maxMen ??
-            this.getStrength(unit) ??
-            100
-        );
-    }
-
-
-    setStrength(unit, value) {
-
-        const strength =
-            Math.max(
-                0,
-                Math.round(
-                    Number(value) || 0
-                )
-            );
-
-        unit.strength =
-            strength;
-
-        if ("personnel" in unit) {
-            unit.personnel = strength;
-        }
-
-        if ("men" in unit) {
-            unit.men = strength;
-        }
-    }
-
-
-    getAttack(unit) {
-
-        return Number(
-            unit?.attack ??
-            unit?.attackPower ??
-            6
-        );
-    }
-
-
-    getDefense(unit) {
-
-        return Number(
-            unit?.defense ??
-            unit?.defensePower ??
-            5
-        );
-    }
-
+    // ========================================
+    // 单位射程
+    // ========================================
 
     getRange(unit) {
 
-        return Math.max(
-            1,
-            Number(
-                unit?.range ??
-                unit?.attackRange ??
-                1
-            )
+        if (!unit) {
+            return 0;
+        }
+
+
+        const ranges = {
+
+            infantry: 1,
+
+            motorized: 1,
+
+            armor: 1,
+
+            artillery: 3,
+
+            antitank: 2,
+
+            antiair: 2,
+
+            engineer: 1,
+
+            reconnaissance: 1,
+
+            cavalry: 1,
+
+            headquarters: 1
+
+        };
+
+
+        return (
+            unit.range ??
+            ranges[unit.type] ??
+            1
         );
+
     }
 
 
-    // ========================================================
-    // 是否可以攻击
-    // ========================================================
+    // ========================================
+    // 攻击力
+    // ========================================
 
-    canAttack(attacker, defender) {
+    getAttack(unit) {
 
-        if (!attacker || !defender) {
-            return false;
-        }
+        const values = {
+
+            infantry: 6,
+
+            motorized: 7,
+
+            armor: 10,
+
+            artillery: 8,
+
+            antitank: 9,
+
+            antiair: 4,
+
+            engineer: 6,
+
+            reconnaissance: 5,
+
+            cavalry: 6,
+
+            headquarters: 2
+
+        };
+
+
+        return (
+            unit.attack ??
+            values[unit.type] ??
+            5
+        );
+
+    }
+
+
+    // ========================================
+    // 防御力
+    // ========================================
+
+    getDefense(unit) {
+
+        const values = {
+
+            infantry: 6,
+
+            motorized: 6,
+
+            armor: 9,
+
+            artillery: 4,
+
+            antitank: 5,
+
+            antiair: 4,
+
+            engineer: 7,
+
+            reconnaissance: 4,
+
+            cavalry: 5,
+
+            headquarters: 3
+
+        };
+
+
+        return (
+            unit.defense ??
+            values[unit.type] ??
+            5
+        );
+
+    }
+
+
+    // ========================================
+    // 是否为敌对阵营
+    // ========================================
+
+    areEnemies(a, b) {
+
+        return (
+            a &&
+            b &&
+            a.faction !==
+            b.faction
+        );
+
+    }
+
+
+    // ========================================
+    // 是否能够攻击
+    // ========================================
+
+    canAttack(
+        attacker,
+        defender
+    ) {
 
         if (
-            !this.isEnemy(
+            !attacker ||
+            !defender
+        ) {
+
+            return false;
+
+        }
+
+
+        if (
+            !this.areEnemies(
                 attacker,
                 defender
             )
         ) {
+
             return false;
+
         }
 
-        if (
-            this.getStrength(attacker) <= 0 ||
-            this.getStrength(defender) <= 0
-        ) {
-            return false;
-        }
 
         if (
-            this.getAP(attacker) <
-            this.attackAPCost
+            attacker.destroyed ||
+            defender.destroyed
         ) {
+
             return false;
+
         }
+
+
+        if (
+            (attacker.strength ?? 1) <= 0 ||
+            (defender.strength ?? 1) <= 0
+        ) {
+
+            return false;
+
+        }
+
+
+        if (
+            attacker.hasAttacked === true
+        ) {
+
+            return false;
+
+        }
+
 
         const distance =
-            this.hexDistance(
+            this.getDistance(
                 attacker,
                 defender
             );
+
 
         return (
             distance <=
             this.getRange(attacker)
         );
+
     }
 
 
-    // ========================================================
-    // 计算伤害
-    // ========================================================
+    // ========================================
+    // 找出可以攻击的单位
+    // ========================================
 
-    calculateDamage(attacker, defender) {
+    getAttackableUnits(
+        attacker,
+        units
+    ) {
+
+        if (!attacker) {
+            return [];
+        }
+
+
+        return units.filter(
+
+            unit =>
+                this.canAttack(
+                    attacker,
+                    unit
+                )
+
+        );
+
+    }
+
+
+    // ========================================
+    // 伤害计算
+    // ========================================
+
+    calculateDamage(
+        attacker,
+        defender
+    ) {
 
         const attack =
-            this.getAttack(attacker);
+            this.getAttack(
+                attacker
+            );
+
 
         const defense =
-            this.getDefense(defender);
-
-        const strengthRatio =
             Math.max(
-                0.20,
-                this.getStrength(attacker) /
-                Math.max(
-                    1,
-                    this.getMaxStrength(attacker)
+                1,
+                this.getDefense(
+                    defender
                 )
             );
 
-        const moraleModifier =
+
+        const attackerStrength =
+            attacker.strength ??
+            100;
+
+
+        // 单位兵力越低，
+        // 实际攻击能力越低
+
+        const strengthFactor =
             Math.max(
-                0.50,
-                Number(
-                    attacker.morale ??
-                    80
-                ) / 100
+                0.25,
+                attackerStrength / 150
             );
 
-        const suppressionModifier =
-            Math.max(
-                0.40,
-                1 -
-                Number(
-                    attacker.suppression ??
-                    0
-                ) / 150
-            );
+
+        const ratio =
+            attack /
+            defense;
+
+
+        const randomFactor =
+            0.85 +
+            Math.random() * 0.30;
+
 
         let damage =
-            (
-                attack * 4 -
-                defense * 1.5
-            )
-            *
-            strengthRatio
-            *
-            moraleModifier
-            *
-            suppressionModifier;
+            20 *
+            ratio *
+            strengthFactor *
+            randomFactor;
+
+
+        // 装甲攻击步兵略有优势
+
+        if (
+            attacker.type === "armor" &&
+            defender.type === "infantry"
+        ) {
+
+            damage *= 1.20;
+
+        }
+
+
+        // 反坦克攻击装甲获得明显加成
+
+        if (
+            attacker.type === "antitank" &&
+            defender.type === "armor"
+        ) {
+
+            damage *= 1.50;
+
+        }
+
+
+        // 炮兵间接火力
+
+        if (
+            attacker.type === "artillery"
+        ) {
+
+            damage *= 1.10;
+
+        }
+
 
         return Math.max(
             1,
             Math.round(damage)
         );
+
     }
 
 
-    // ========================================================
-    // 攻击
-    // ========================================================
+    // ========================================
+    // 执行攻击
+    // ========================================
 
-    attack(attacker, defender) {
+    attack(
+        attacker,
+        defender
+    ) {
 
         if (
             !this.canAttack(
@@ -319,14 +400,23 @@ export class CombatSystem {
                 defender
             )
         ) {
+
             return {
+
                 success: false,
-                reason: "cannot_attack"
+
+                reason:
+                    "目标不在攻击范围内或该单位已经攻击"
+
             };
+
         }
 
-        const oldStrength =
-            this.getStrength(defender);
+
+        const beforeStrength =
+            defender.strength ??
+            100;
+
 
         const damage =
             this.calculateDamage(
@@ -334,46 +424,35 @@ export class CombatSystem {
                 defender
             );
 
-        const newStrength =
+
+        defender.strength =
             Math.max(
                 0,
-                oldStrength - damage
+                beforeStrength -
+                damage
             );
 
-        this.setStrength(
-            defender,
-            newStrength
-        );
 
-        this.setAP(
-            attacker,
-            this.getAP(attacker) -
-            this.attackAPCost
-        );
+        attacker.hasAttacked =
+            true;
 
-        attacker.ammunition =
-            Math.max(
-                0,
-                Number(
-                    attacker.ammunition ??
-                    100
-                ) - 5
-            );
 
-        defender.suppression =
-            Math.min(
-                100,
-                Number(
-                    defender.suppression ??
-                    0
-                ) +
-                Math.max(
-                    5,
-                    Math.round(
-                        damage / 2
-                    )
-                )
-            );
+        let destroyed =
+            false;
+
+
+        if (
+            defender.strength <= 0
+        ) {
+
+            defender.destroyed =
+                true;
+
+            destroyed =
+                true;
+
+        }
+
 
         return {
 
@@ -385,15 +464,64 @@ export class CombatSystem {
 
             damage,
 
-            oldStrength,
+            beforeStrength,
 
-            newStrength,
+            afterStrength:
+                defender.strength,
 
-            destroyed:
-                newStrength <= 0,
+            destroyed,
 
-            remainingAP:
-                this.getAP(attacker)
+            distance:
+                this.getDistance(
+                    attacker,
+                    defender
+                )
+
         };
+
     }
+
+
+    // ========================================
+    // 新行动阶段重置攻击状态
+    // ========================================
+
+    resetUnit(unit) {
+
+        if (!unit) {
+            return;
+        }
+
+
+        unit.hasAttacked =
+            false;
+
+    }
+
+
+    resetFaction(
+        units,
+        faction
+    ) {
+
+        for (
+            const unit
+            of units
+        ) {
+
+            if (
+                unit.faction ===
+                faction
+            ) {
+
+                this.resetUnit(
+                    unit
+                );
+
+            }
+
+        }
+
+    }
+
 }
