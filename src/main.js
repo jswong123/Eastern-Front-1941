@@ -1,18 +1,10 @@
 // ============================================================
 // main.js
 // 东线 1941：杜布诺
-// V0.7
+// V0.8
 //
-// 核心功能：
-// 1. 地图
-// 2. 单位选择
-// 3. 双方轮流行动
-// 4. 移动范围
-// 5. 单位移动
-// 6. 基础攻击
-// 7. 战斗伤亡
-// 8. 单位消灭
-// 9. 回合推进
+// 玩家：手动移动、攻击
+// AI：自动移动、攻击
 // ============================================================
 
 import { WorldMap } from "./WorldMap.js";
@@ -23,6 +15,8 @@ import { GameState } from "./GameState.js";
 import { FactionSelection } from "./FactionSelection.js";
 import { TurnSystem } from "./TurnSystem.js";
 import { MovementSystem } from "./systems/MovementSystem.js";
+import { CombatSystem } from "./systems/CombatSystem.js";
+import { AISystem } from "./systems/AISystem.js";
 import { pixelToHex } from "./Hex.js";
 
 
@@ -31,28 +25,44 @@ import { pixelToHex } from "./Hex.js";
 // ============================================================
 
 const canvas =
-    document.getElementById("game-canvas");
+    document.getElementById(
+        "game-canvas"
+    );
 
 const mapArea =
-    document.getElementById("mapArea");
+    document.getElementById(
+        "mapArea"
+    );
 
 const unitInfo =
-    document.getElementById("unitInfo");
+    document.getElementById(
+        "unitInfo"
+    );
 
 const turnInfo =
-    document.getElementById("turnInfo");
+    document.getElementById(
+        "turnInfo"
+    );
 
 const turnNumber =
-    document.getElementById("turnNumber");
+    document.getElementById(
+        "turnNumber"
+    );
 
 const turnTime =
-    document.getElementById("turnTime");
+    document.getElementById(
+        "turnTime"
+    );
 
 const turnPhase =
-    document.getElementById("turnPhase");
+    document.getElementById(
+        "turnPhase"
+    );
 
 const endPhaseButton =
-    document.getElementById("endPhaseButton");
+    document.getElementById(
+        "endPhaseButton"
+    );
 
 
 if (!canvas) {
@@ -64,7 +74,7 @@ if (!canvas) {
 
 
 // ============================================================
-// 核心对象
+// 系统
 // ============================================================
 
 const world =
@@ -94,6 +104,15 @@ const movementSystem =
         world
     );
 
+const combatSystem =
+    new CombatSystem();
+
+const aiSystem =
+    new AISystem(
+        movementSystem,
+        combatSystem
+    );
+
 const factionSelection =
     new FactionSelection(
         gameState
@@ -106,6 +125,9 @@ renderer.selection =
 renderer.movementSystem =
     movementSystem;
 
+renderer.gameState =
+    gameState;
+
 
 // ============================================================
 // 游戏状态
@@ -113,9 +135,11 @@ renderer.movementSystem =
 
 let units = [];
 
+let turnSystem = null;
+
 let selectedUnit = null;
 
-let turnSystem = null;
+let aiRunning = false;
 
 
 // 地图拖动
@@ -130,14 +154,7 @@ let lastMouseY = 0;
 
 
 // ============================================================
-// 战斗系统参数
-// ============================================================
-
-const ATTACK_AP_COST = 2;
-
-
-// ============================================================
-// 阵营标准化
+// 阵营
 // ============================================================
 
 function normalizeSide(value) {
@@ -149,7 +166,6 @@ function normalizeSide(value) {
             .trim()
             .toLowerCase();
 
-
     if (
         value === "ger" ||
         value === "german" ||
@@ -157,91 +173,157 @@ function normalizeSide(value) {
         value === "axis" ||
         value === "德军"
     ) {
-
         return "german";
     }
-
 
     if (
         value === "ussr" ||
         value === "soviet" ||
         value === "redarmy" ||
         value === "red_army" ||
-        value === "苏军" ||
-        value === "红军"
+        value === "苏军"
     ) {
-
         return "soviet";
     }
-
-
-    if (
-        value === "observer"
-    ) {
-
-        return "observer";
-    }
-
 
     return value;
 }
 
 
-// ============================================================
-// 单位阵营
-// ============================================================
-
-function unitSide(unit) {
+function getUnitSide(unit) {
 
     return normalizeSide(
-
         unit?.side ??
-
         unit?.faction ??
-
         unit?.camp ??
-
         unit?.nation
     );
 }
 
 
-// ============================================================
-// 当前行动阶段
-// ============================================================
+function getPlayerSide() {
+
+    return normalizeSide(
+        gameState.playerSide ??
+        gameState.side ??
+        gameState.faction ??
+        gameState.playerFaction
+    );
+}
+
+
+function getAISide() {
+
+    return (
+        getPlayerSide() === "soviet"
+            ? "german"
+            : "soviet"
+    );
+}
+
 
 function currentPhase() {
 
     if (!turnSystem) {
-
         return "german";
     }
 
-
     return normalizeSide(
-
         turnSystem.phase ??
-
         turnSystem.currentPhase ??
-
         turnSystem.side ??
-
         "german"
     );
 }
 
 
-// ============================================================
-// 当前阶段名称
-// ============================================================
-
-function phaseName() {
+function isPlayerPhase() {
 
     return (
-        currentPhase() === "soviet"
-            ? "苏军"
-            : "德军"
+        currentPhase() ===
+        getPlayerSide()
     );
+}
+
+
+function isAIPhase() {
+
+    return (
+        currentPhase() ===
+        getAISide()
+    );
+}
+
+
+// ============================================================
+// 单位红蓝关系
+// ============================================================
+
+function updateUnitRelations() {
+
+    const player =
+        getPlayerSide();
+
+    if (!player) {
+        return;
+    }
+
+    for (const unit of units) {
+
+        if (
+            getUnitSide(unit) ===
+            player
+        ) {
+
+            unit.relation =
+                "friendly";
+
+            unit.displayColor =
+                "#4f78a8";
+        }
+
+        else {
+
+            unit.relation =
+                "enemy";
+
+            unit.displayColor =
+                "#a94f4f";
+        }
+    }
+}
+
+
+// ============================================================
+// AP
+// ============================================================
+
+function getAP(unit) {
+
+    return combatSystem
+        .getAP(unit);
+}
+
+
+function getMaxAP(unit) {
+
+    return Number(
+        unit?.maxActionPoints ??
+        unit?.maxAP ??
+        unit?.maxMovementPoints ??
+        getAP(unit) ??
+        6
+    );
+}
+
+
+function setAP(unit, value) {
+
+    combatSystem
+        .setAP(
+            unit,
+            value
+        );
 }
 
 
@@ -251,6 +333,9 @@ function phaseName() {
 
 function render() {
 
+    renderer.units =
+        units;
+
     renderer.render(
         units
     );
@@ -258,7 +343,7 @@ function render() {
 
 
 // ============================================================
-// Canvas 大小
+// Canvas
 // ============================================================
 
 function resizeCanvas() {
@@ -267,10 +352,9 @@ function resizeCanvas() {
         mapArea ??
         canvas.parentElement;
 
-
     const rect =
-        parent.getBoundingClientRect();
-
+        parent
+            .getBoundingClientRect();
 
     canvas.width =
         Math.max(
@@ -280,7 +364,6 @@ function resizeCanvas() {
             )
         );
 
-
     canvas.height =
         Math.max(
             1,
@@ -289,10 +372,8 @@ function resizeCanvas() {
             )
         );
 
-
     canvas.style.width =
         `${rect.width}px`;
-
 
     canvas.style.height =
         `${rect.height}px`;
@@ -304,173 +385,9 @@ window.addEventListener(
     () => {
 
         resizeCanvas();
-
         render();
     }
 );
-
-
-// ============================================================
-// AP
-// ============================================================
-
-function getAP(unit) {
-
-    return Number(
-
-        unit?.actionPoints ??
-
-        unit?.ap ??
-
-        unit?.movementPoints ??
-
-        0
-    );
-}
-
-
-function getMaxAP(unit) {
-
-    return Number(
-
-        unit?.maxActionPoints ??
-
-        unit?.maxAP ??
-
-        unit?.maxMovementPoints ??
-
-        getAP(unit)
-    );
-}
-
-
-function setAP(
-    unit,
-    value
-) {
-
-    const ap =
-        Math.max(
-            0,
-            Number(value) || 0
-        );
-
-
-    unit.actionPoints =
-        ap;
-
-
-    unit.ap =
-        ap;
-
-
-    unit.movementPoints =
-        ap;
-}
-
-
-// ============================================================
-// 战斗属性
-// ============================================================
-
-function getStrength(unit) {
-
-    return Number(
-
-        unit?.strength ??
-
-        unit?.personnel ??
-
-        unit?.men ??
-
-        160
-    );
-}
-
-
-function getMaxStrength(unit) {
-
-    return Number(
-
-        unit?.maxStrength ??
-
-        unit?.maxPersonnel ??
-
-        unit?.maxMen ??
-
-        160
-    );
-}
-
-
-function setStrength(
-    unit,
-    value
-) {
-
-    const strength =
-        Math.max(
-            0,
-            Math.round(
-                Number(value) || 0
-            )
-        );
-
-
-    unit.strength =
-        strength;
-
-
-    if (
-        "personnel" in unit
-    ) {
-
-        unit.personnel =
-            strength;
-    }
-
-
-    if (
-        "men" in unit
-    ) {
-
-        unit.men =
-            strength;
-    }
-}
-
-
-function getAttack(unit) {
-
-    return Number(
-        unit?.attack ??
-        unit?.attackPower ??
-        6
-    );
-}
-
-
-function getDefense(unit) {
-
-    return Number(
-        unit?.defense ??
-        unit?.defensePower ??
-        5
-    );
-}
-
-
-function getRange(unit) {
-
-    return Math.max(
-        1,
-        Number(
-            unit?.range ??
-            unit?.attackRange ??
-            1
-        )
-    );
-}
 
 
 // ============================================================
@@ -479,43 +396,141 @@ function getRange(unit) {
 
 function initializeUnits() {
 
-    for (
-        const unit of units
-    ) {
+    for (const unit of units) {
 
         unit.q =
             Number(
                 unit.q ?? 0
             );
 
-
         unit.r =
             Number(
                 unit.r ?? 0
             );
 
+        unit.side =
+            getUnitSide(unit);
 
-        const side =
-            unitSide(unit);
+
+        // AP
+
+        let maxAP =
+            getMaxAP(unit);
+
+        if (
+            !Number.isFinite(maxAP) ||
+            maxAP <= 0
+        ) {
+            maxAP = 6;
+        }
+
+        unit.maxActionPoints =
+            maxAP;
+
+        setAP(
+            unit,
+            maxAP
+        );
 
 
-        if (side) {
+        // 战斗属性
 
-            unit.side =
-                side;
+        if (
+            unit.maxStrength == null
+        ) {
+            unit.maxStrength =
+                Number(
+                    unit.maxPersonnel ??
+                    unit.maxMen ??
+                    unit.strength ??
+                    unit.personnel ??
+                    100
+                );
+        }
+
+        if (
+            unit.strength == null
+        ) {
+            unit.strength =
+                Number(
+                    unit.personnel ??
+                    unit.maxStrength ??
+                    100
+                );
+        }
+
+        if (
+            unit.attack == null
+        ) {
+            unit.attack = 6;
+        }
+
+        if (
+            unit.defense == null
+        ) {
+            unit.defense = 5;
+        }
+
+        if (
+            unit.range == null
+        ) {
+
+            const type =
+                String(
+                    unit.type ??
+                    unit.typeZh ??
+                    ""
+                )
+                    .toLowerCase();
+
+            if (
+                type.includes("artillery") ||
+                type.includes("炮兵")
+            ) {
+                unit.range = 3;
+            }
+
+            else if (
+                type.includes("anti") ||
+                type.includes("反坦克")
+            ) {
+                unit.range = 2;
+            }
+
+            else {
+                unit.range = 1;
+            }
+        }
+
+        if (unit.morale == null) {
+            unit.morale = 80;
+        }
+
+        if (unit.suppression == null) {
+            unit.suppression = 0;
+        }
+
+        if (unit.fatigue == null) {
+            unit.fatigue = 0;
+        }
+
+        if (unit.ammunition == null) {
+            unit.ammunition = 100;
         }
 
 
         if (
-            typeof movementSystem.initializeUnit ===
+            typeof movementSystem
+                .initializeUnit ===
             "function"
         ) {
 
             try {
 
-                movementSystem.initializeUnit(
-                    unit
-                );
+                movementSystem
+                    .initializeUnit(
+                        unit
+                    );
 
             }
 
@@ -527,772 +542,32 @@ function initializeUnits() {
                 );
             }
         }
-
-
-        // ------------------------
-        // AP
-        // ------------------------
-
-        let maxAP =
-            getMaxAP(unit);
-
-
-        if (
-            !Number.isFinite(maxAP) ||
-            maxAP <= 0
-        ) {
-
-            maxAP = 6;
-        }
-
-
-        unit.maxActionPoints =
-            maxAP;
-
-
-        if (
-            !Number.isFinite(
-                getAP(unit)
-            )
-        ) {
-
-            setAP(
-                unit,
-                maxAP
-            );
-        }
-
-
-        // ------------------------
-        // 战斗属性
-        // ------------------------
-
-        if (
-            unit.maxStrength == null
-        ) {
-
-            unit.maxStrength =
-                Number(
-                    unit.maxPersonnel ??
-                    unit.maxMen ??
-                    getStrength(unit) ??
-                    160
-                );
-        }
-
-
-        if (
-            unit.strength == null
-        ) {
-
-            unit.strength =
-                Number(
-                    unit.personnel ??
-                    unit.men ??
-                    unit.maxStrength ??
-                    160
-                );
-        }
-
-
-        if (
-            unit.attack == null
-        ) {
-
-            unit.attack =
-                Number(
-                    unit.attackPower ??
-                    6
-                );
-        }
-
-
-        if (
-            unit.defense == null
-        ) {
-
-            unit.defense =
-                Number(
-                    unit.defensePower ??
-                    5
-                );
-        }
-
-
-        if (
-            unit.range == null
-        ) {
-
-            unit.range =
-                Number(
-                    unit.attackRange ??
-                    1
-                );
-        }
-
-
-        // ------------------------
-        // 状态
-        // ------------------------
-
-        if (
-            unit.morale == null
-        ) {
-
-            unit.morale = 80;
-        }
-
-
-        if (
-            unit.suppression == null
-        ) {
-
-            unit.suppression = 0;
-        }
-
-
-        if (
-            unit.fatigue == null
-        ) {
-
-            unit.fatigue = 0;
-        }
-
-
-        if (
-            unit.ammunition == null
-        ) {
-
-            unit.ammunition = 100;
-        }
     }
 }
 
 
 // ============================================================
-// 当前阶段是否可以控制单位
+// 玩家是否能操作
 // ============================================================
 
-function canControl(unit) {
+function playerCanControlUnit(unit) {
 
     if (!unit) {
-
         return false;
     }
 
+    if (aiRunning) {
+        return false;
+    }
 
-    /*
-     * V0.7：
-     *
-     * 不再锁死在玩家最初选择的阵营。
-     *
-     * 德军阶段：
-     * 控制德军。
-     *
-     * 苏军阶段：
-     * 控制苏军。
-     */
+    if (!isPlayerPhase()) {
+        return false;
+    }
 
     return (
-        unitSide(unit) ===
-        currentPhase()
+        getUnitSide(unit) ===
+        getPlayerSide()
     );
-}
-
-
-// ============================================================
-// 六角格距离
-// ============================================================
-
-function hexDistance(
-    a,
-    b
-) {
-
-    if (
-        !a ||
-        !b
-    ) {
-
-        return Infinity;
-    }
-
-
-    const dq =
-        Number(a.q) -
-        Number(b.q);
-
-
-    const dr =
-        Number(a.r) -
-        Number(b.r);
-
-
-    return (
-        Math.abs(dq) +
-        Math.abs(dr) +
-        Math.abs(dq + dr)
-    ) / 2;
-}
-
-
-// ============================================================
-// 是否敌军
-// ============================================================
-
-function isEnemy(
-    attacker,
-    defender
-) {
-
-    if (
-        !attacker ||
-        !defender
-    ) {
-
-        return false;
-    }
-
-
-    return (
-        unitSide(attacker) !==
-        unitSide(defender)
-    );
-}
-
-
-// ============================================================
-// 是否可以攻击
-// ============================================================
-
-function canAttack(
-    attacker,
-    defender
-) {
-
-    if (
-        !attacker ||
-        !defender
-    ) {
-
-        return false;
-    }
-
-
-    if (
-        !canControl(attacker)
-    ) {
-
-        return false;
-    }
-
-
-    if (
-        !isEnemy(
-            attacker,
-            defender
-        )
-    ) {
-
-        return false;
-    }
-
-
-    if (
-        getStrength(attacker) <= 0 ||
-        getStrength(defender) <= 0
-    ) {
-
-        return false;
-    }
-
-
-    if (
-        getAP(attacker) <
-        ATTACK_AP_COST
-    ) {
-
-        return false;
-    }
-
-
-    const distance =
-        hexDistance(
-            attacker,
-            defender
-        );
-
-
-    return (
-        distance <=
-        getRange(attacker)
-    );
-}
-
-
-// ============================================================
-// 伤害计算
-// ============================================================
-
-function calculateDamage(
-    attacker,
-    defender
-) {
-
-    const attack =
-        getAttack(attacker);
-
-
-    const defense =
-        getDefense(defender);
-
-
-    const strengthRatio =
-        Math.max(
-            0.1,
-            getStrength(attacker) /
-            Math.max(
-                1,
-                getMaxStrength(attacker)
-            )
-        );
-
-
-    /*
-     * 第一版采用确定性伤害。
-     *
-     * 以后可以替换成：
-     *
-     * - 软攻击
-     * - 硬攻击
-     * - 装甲
-     * - 穿深
-     * - 地形
-     * - 士气
-     * - 压制
-     * - 随机波动
-     */
-
-    let damage =
-
-        (
-            attack * 3 -
-            defense * 1.5
-        ) *
-
-        strengthRatio;
-
-
-    damage =
-        Math.round(
-            damage
-        );
-
-
-    return Math.max(
-        1,
-        damage
-    );
-}
-
-
-// ============================================================
-// 执行攻击
-// ============================================================
-
-function attackUnit(
-    attacker,
-    defender
-) {
-
-    if (
-        !canAttack(
-            attacker,
-            defender
-        )
-    ) {
-
-        return false;
-    }
-
-
-    const oldStrength =
-        getStrength(defender);
-
-
-    const damage =
-        calculateDamage(
-            attacker,
-            defender
-        );
-
-
-    const newStrength =
-        Math.max(
-            0,
-            oldStrength -
-            damage
-        );
-
-
-    setStrength(
-        defender,
-        newStrength
-    );
-
-
-    setAP(
-        attacker,
-        getAP(attacker) -
-        ATTACK_AP_COST
-    );
-
-
-    /*
-     * 弹药消耗
-     */
-
-    attacker.ammunition =
-        Math.max(
-            0,
-            Number(
-                attacker.ammunition ??
-                100
-            ) - 5
-        );
-
-
-    /*
-     * 被攻击单位受到压制
-     */
-
-    defender.suppression =
-        Math.min(
-            100,
-            Number(
-                defender.suppression ??
-                0
-            ) +
-            Math.max(
-                5,
-                Math.round(
-                    damage / 2
-                )
-            )
-        );
-
-
-    console.log(
-        "========== 战斗 =========="
-    );
-
-
-    console.log(
-        attacker.id ??
-        attacker.name,
-        "攻击",
-        defender.id ??
-        defender.name
-    );
-
-
-    console.log(
-        "距离：",
-        hexDistance(
-            attacker,
-            defender
-        )
-    );
-
-
-    console.log(
-        "伤害：",
-        damage
-    );
-
-
-    console.log(
-        "兵力：",
-        oldStrength,
-        "→",
-        newStrength
-    );
-
-
-    /*
-     * 单位被消灭
-     */
-
-    if (
-        newStrength <= 0
-    ) {
-
-        destroyUnit(
-            defender
-        );
-    }
-
-
-    showUnitInfo(
-        attacker
-    );
-
-
-    calculateReachable(
-        attacker
-    );
-
-
-    render();
-
-
-    return true;
-}
-
-
-// ============================================================
-// 消灭单位
-// ============================================================
-
-function destroyUnit(unit) {
-
-    const index =
-        units.indexOf(unit);
-
-
-    if (
-        index >= 0
-    ) {
-
-        units.splice(
-            index,
-            1
-        );
-    }
-
-
-    if (
-        selectedUnit === unit
-    ) {
-
-        selectedUnit =
-            null;
-    }
-
-
-    console.log(
-        "单位被消灭：",
-        unit.id ??
-        unit.name
-    );
-
-
-    renderer.units =
-        units;
-
-
-    selection.units =
-        units;
-
-
-    gameState.units =
-        units;
-}
-
-
-// ============================================================
-// 重置当前行动方 AP
-// ============================================================
-
-function resetPhaseUnits(side) {
-
-    side =
-        normalizeSide(side);
-
-
-    for (
-        const unit of units
-    ) {
-
-        if (
-            unitSide(unit) !==
-            side
-        ) {
-
-            continue;
-        }
-
-
-        setAP(
-            unit,
-            getMaxAP(unit)
-        );
-
-
-        /*
-         * 每个行动阶段轻微恢复压制。
-         */
-
-        unit.suppression =
-            Math.max(
-                0,
-                Number(
-                    unit.suppression ??
-                    0
-                ) - 10
-            );
-    }
-}
-
-
-// ============================================================
-// 回合系统
-// ============================================================
-
-function initializeTurnSystem() {
-
-    turnSystem =
-        new TurnSystem({
-
-            units,
-
-            year: 1941,
-
-            month: 6,
-
-            day: 26,
-
-            hour: 8,
-
-            minute: 0,
-
-            hoursPerTurn: 2,
-
-            startingPhase:
-                "german"
-        });
-
-
-    turnSystem.onPhaseChanged =
-        () => {
-
-            clearSelection();
-
-            resetPhaseUnits(
-                currentPhase()
-            );
-
-            updateTurnUI();
-
-            render();
-        };
-
-
-    turnSystem.onTurnChanged =
-        () => {
-
-            updateTurnUI();
-
-            render();
-        };
-
-
-    turnSystem.onTimeChanged =
-        () => {
-
-            updateTurnUI();
-        };
-
-
-    /*
-     * 第一阶段德军获得完整 AP。
-     */
-
-    resetPhaseUnits(
-        "german"
-    );
-
-
-    updateTurnUI();
-}
-
-
-// ============================================================
-// 更新回合 UI
-// ============================================================
-
-function updateTurnUI() {
-
-    if (!turnSystem) {
-
-        return;
-    }
-
-
-    const phase =
-        currentPhase();
-
-
-    const number =
-
-        turnSystem.turn ??
-
-        turnSystem.turnNumber ??
-
-        1;
-
-
-    if (turnNumber) {
-
-        turnNumber.textContent =
-            `第${number}回合`;
-    }
-
-
-    if (turnPhase) {
-
-        turnPhase.textContent =
-
-            phase === "soviet"
-
-                ? "苏军行动"
-
-                : "德军行动";
-    }
-
-
-    if (endPhaseButton) {
-
-        endPhaseButton.textContent =
-
-            phase === "soviet"
-
-                ? "结束苏军行动"
-
-                : "结束德军行动";
-    }
-
-
-    if (
-        turnInfo &&
-        typeof turnSystem.getHeaderText ===
-        "function"
-    ) {
-
-        turnInfo.textContent =
-            turnSystem.getHeaderText();
-    }
-
-
-    if (
-        turnTime &&
-        typeof turnSystem.getTurnTimeRange ===
-        "function"
-    ) {
-
-        turnTime.textContent =
-            turnSystem.getTurnTimeRange();
-    }
 }
 
 
@@ -1306,55 +581,24 @@ function showUnitInfo(unit) {
         !unitInfo ||
         !unit
     ) {
-
         return;
     }
 
-
-    const sideName =
-
-        unitSide(unit) ===
-        "german"
-
-            ? "德军"
-
-            : "苏军";
-
+    const friendly =
+        getUnitSide(unit) ===
+        getPlayerSide();
 
     const name =
-
         unit.nameZh ??
-
         unit.name ??
-
         unit.id ??
-
         "未命名单位";
 
-
     const type =
-
         unit.typeZh ??
-
         unit.type ??
-
         unit.unitType ??
-
         "未知";
-
-
-    const status =
-
-        canControl(unit)
-
-            ? (
-                getAP(unit) > 0
-                    ? "可行动"
-                    : "行动点耗尽"
-            )
-
-            : "等待行动阶段";
-
 
     unitInfo.innerHTML = `
 
@@ -1363,8 +607,10 @@ function showUnitInfo(unit) {
         </div>
 
         <div class="unit-row">
-            <span>阵营</span>
-            <strong>${sideName}</strong>
+            <span>关系</span>
+            <strong>
+                ${friendly ? "我方" : "敌方"}
+            </strong>
         </div>
 
         <div class="unit-row">
@@ -1375,30 +621,30 @@ function showUnitInfo(unit) {
         <div class="unit-row">
             <span>兵力</span>
             <strong>
-                ${getStrength(unit)}
+                ${combatSystem.getStrength(unit)}
                 /
-                ${getMaxStrength(unit)}
+                ${combatSystem.getMaxStrength(unit)}
             </strong>
         </div>
 
         <div class="unit-row">
             <span>攻击</span>
             <strong>
-                ${getAttack(unit)}
+                ${combatSystem.getAttack(unit)}
             </strong>
         </div>
 
         <div class="unit-row">
             <span>防御</span>
             <strong>
-                ${getDefense(unit)}
+                ${combatSystem.getDefense(unit)}
             </strong>
         </div>
 
         <div class="unit-row">
             <span>射程</span>
             <strong>
-                ${getRange(unit)}
+                ${combatSystem.getRange(unit)}
             </strong>
         </div>
 
@@ -1414,28 +660,21 @@ function showUnitInfo(unit) {
         <div class="unit-row">
             <span>士气</span>
             <strong>
-                ${unit.morale ?? "—"}
+                ${unit.morale}
             </strong>
         </div>
 
         <div class="unit-row">
             <span>压制</span>
             <strong>
-                ${unit.suppression ?? "—"}
-            </strong>
-        </div>
-
-        <div class="unit-row">
-            <span>疲劳</span>
-            <strong>
-                ${unit.fatigue ?? "—"}
+                ${unit.suppression}
             </strong>
         </div>
 
         <div class="unit-row">
             <span>弹药</span>
             <strong>
-                ${unit.ammunition ?? "—"}%
+                ${unit.ammunition}%
             </strong>
         </div>
 
@@ -1450,324 +689,160 @@ function showUnitInfo(unit) {
         <div class="unit-row">
             <span>状态</span>
             <strong>
-                ${status}
+                ${
+                    playerCanControlUnit(unit)
+                        ? "可操作"
+                        : friendly
+                            ? "等待我方阶段"
+                            : "AI控制"
+                }
             </strong>
         </div>
-
     `;
 }
 
 
 // ============================================================
-// 清除移动范围
+// 移动范围
 // ============================================================
 
 function clearReachable() {
 
     if (
-        typeof movementSystem.clearSelection ===
+        movementSystem.reachable
+        instanceof Map
+    ) {
+        movementSystem
+            .reachable
+            .clear();
+    }
+
+    if (
+        typeof movementSystem
+            .clearSelection ===
         "function"
     ) {
 
         try {
 
-            movementSystem.clearSelection();
+            movementSystem
+                .clearSelection();
 
         }
 
         catch (error) {
-
             console.warn(error);
         }
     }
 
-
     if (
-        movementSystem.reachable
-        instanceof Map
-    ) {
-
-        movementSystem.reachable.clear();
-    }
-
-
-    if (
-        movementSystem.reachableHexes
-        instanceof Map
-    ) {
-
-        movementSystem.reachableHexes.clear();
-    }
-
-
-    if (
-        typeof renderer.clearReachable ===
+        typeof renderer
+            .clearReachable ===
         "function"
     ) {
-
         renderer.clearReachable();
     }
 }
 
 
-// ============================================================
-// 计算移动范围
-// ============================================================
-
 function calculateReachable(unit) {
 
     clearReachable();
 
-
     if (
-        !unit ||
-        !canControl(unit) ||
-        getAP(unit) <= 0
+        !playerCanControlUnit(unit)
     ) {
-
         return;
     }
-
 
     unit.movementPoints =
         getAP(unit);
 
-
-    let result =
-        null;
-
-
-    if (
-        typeof movementSystem.selectUnit ===
-        "function"
-    ) {
-
-        try {
-
-            result =
-                movementSystem.selectUnit(
-                    unit,
-                    units
-                );
-
-        }
-
-        catch (error) {
-
-            console.warn(
-                "selectUnit:",
-                error
-            );
-        }
-    }
-
-
-    else if (
-        typeof movementSystem.calculateReachable ===
-        "function"
-    ) {
-
-        try {
-
-            result =
-                movementSystem.calculateReachable(
-                    unit,
-                    units
-                );
-
-        }
-
-        catch (error) {
-
-            console.warn(
-                "calculateReachable:",
-                error
-            );
-        }
-    }
-
-
-    else if (
-        typeof movementSystem.computeReachable ===
-        "function"
-    ) {
-
-        try {
-
-            result =
-                movementSystem.computeReachable(
-                    unit,
-                    units
-                );
-
-        }
-
-        catch (error) {
-
-            console.warn(
-                "computeReachable:",
-                error
-            );
-        }
-    }
-
+    movementSystem
+        .selectUnit(
+            unit,
+            units
+        );
 
     if (
-        result instanceof Map
-    ) {
-
-        movementSystem.reachable =
-            result;
-    }
-
-
-    const reachable =
-
-        movementSystem.reachable ??
-
-        movementSystem.reachableHexes ??
-
-        result;
-
-
-    if (
-        typeof renderer.setReachable ===
+        typeof renderer
+            .setReachable ===
         "function"
     ) {
-
         renderer.setReachable(
-            reachable
+            movementSystem.reachable
         );
     }
 }
 
 
 // ============================================================
-// 选择单位
+// 选择
 // ============================================================
 
 function selectUnit(unit) {
 
     if (!unit) {
-
         return;
     }
-
 
     selectedUnit =
         unit;
 
-
     selection.selectedUnit =
         unit;
 
-
     if (
-        typeof selection.select ===
+        typeof renderer
+            .setSelectedUnit ===
         "function"
     ) {
-
-        try {
-
-            selection.select(
-                unit
-            );
-
-        }
-
-        catch (error) {
-
-            console.warn(
-                "UnitSelection.select:",
-                error
-            );
-        }
-    }
-
-
-    if (
-        typeof renderer.setSelectedUnit ===
-        "function"
-    ) {
-
         renderer.setSelectedUnit(
             unit
         );
     }
 
-
     showUnitInfo(
         unit
     );
 
-
     if (
-        canControl(unit)
+        playerCanControlUnit(unit)
     ) {
-
         calculateReachable(
             unit
         );
     }
 
     else {
-
         clearReachable();
     }
-
 
     render();
 }
 
-
-// ============================================================
-// 取消选择
-// ============================================================
 
 function clearSelection() {
 
     selectedUnit =
         null;
 
-
-    if (
-        typeof selection.clear ===
-        "function"
-    ) {
-
-        try {
-
-            selection.clear();
-
-        }
-
-        catch (error) {
-
-            console.warn(error);
-        }
-    }
-
-
     selection.selectedUnit =
         null;
 
+    clearReachable();
 
     if (
-        typeof renderer.setSelectedUnit ===
+        typeof renderer
+            .setSelectedUnit ===
         "function"
     ) {
-
         renderer.setSelectedUnit(
             null
         );
     }
 
-
-    clearReachable();
-
-
     if (unitInfo) {
-
         unitInfo.innerHTML =
             "点击地图上的单位查看详情";
     }
@@ -1775,41 +850,108 @@ function clearSelection() {
 
 
 // ============================================================
-// Hex 上的单位
+// 单位移除
 // ============================================================
 
-function unitAtHex(
-    q,
-    r
-) {
+function destroyUnit(unit) {
 
-    return (
-        units.find(
+    const index =
+        units.indexOf(unit);
 
-            unit =>
+    if (index >= 0) {
 
-                Number(unit.q) ===
-                Number(q)
+        units.splice(
+            index,
+            1
+        );
+    }
 
-                &&
+    renderer.units =
+        units;
 
-                Number(unit.r) ===
-                Number(r)
+    selection.units =
+        units;
 
-        ) ?? null
-    );
+    gameState.units =
+        units;
+
+    if (
+        selectedUnit === unit
+    ) {
+        selectedUnit = null;
+    }
 }
 
 
 // ============================================================
-// 鼠标位置
+// 玩家攻击
+// ============================================================
+
+function playerAttack(
+    attacker,
+    defender
+) {
+
+    if (
+        !playerCanControlUnit(
+            attacker
+        )
+    ) {
+        return false;
+    }
+
+    const result =
+        combatSystem.attack(
+            attacker,
+            defender
+        );
+
+    if (!result.success) {
+
+        console.log(
+            "无法攻击：",
+            result.reason
+        );
+
+        return false;
+    }
+
+    console.log(
+        `${attacker.id} 攻击 ${defender.id}`,
+        `伤害 ${result.damage}`
+    );
+
+    if (
+        result.destroyed
+    ) {
+        destroyUnit(
+            defender
+        );
+    }
+
+    showUnitInfo(
+        attacker
+    );
+
+    calculateReachable(
+        attacker
+    );
+
+    render();
+
+    return true;
+}
+
+
+// ============================================================
+// 鼠标坐标
 // ============================================================
 
 function mousePosition(event) {
 
     const rect =
-        canvas.getBoundingClientRect();
-
+        canvas
+            .getBoundingClientRect();
 
     return {
 
@@ -1824,48 +966,30 @@ function mousePosition(event) {
 }
 
 
-// ============================================================
-// 屏幕 → 世界坐标
-// ============================================================
-
-function screenToWorld(
-    x,
-    y
-) {
+function screenToWorld(x, y) {
 
     if (
-        typeof renderer.screenToWorld ===
+        typeof renderer
+            .screenToWorld ===
         "function"
     ) {
 
-        try {
-
-            const result =
-                renderer.screenToWorld(
+        const result =
+            renderer
+                .screenToWorld(
                     x,
                     y
                 );
 
-
-            if (result) {
-
-                return result;
-            }
-
-        }
-
-        catch (error) {
-
-            console.warn(error);
+        if (result) {
+            return result;
         }
     }
-
 
     const zoom =
         Number(
             camera.zoom ?? 1
         );
-
 
     const offsetX =
         Number(
@@ -1874,14 +998,12 @@ function screenToWorld(
             0
         );
 
-
     const offsetY =
         Number(
             camera.y ??
             camera.offsetY ??
             0
         );
-
 
     return {
 
@@ -1896,10 +1018,6 @@ function screenToWorld(
 }
 
 
-// ============================================================
-// 鼠标 → Hex
-// ============================================================
-
 function mouseToHex(event) {
 
     const mouse =
@@ -1907,40 +1025,30 @@ function mouseToHex(event) {
             event
         );
 
-
-    const worldPoint =
+    const point =
         screenToWorld(
             mouse.x,
             mouse.y
         );
 
-
     const size =
         Number(
-
             renderer.hexSize ??
-
             renderer.size ??
-
             world.hexSize ??
-
             18
         );
 
-
     const hex =
         pixelToHex(
-            worldPoint.x,
-            worldPoint.y,
+            point.x,
+            point.y,
             size
         );
 
-
     if (!hex) {
-
         return null;
     }
-
 
     return {
 
@@ -1957,68 +1065,33 @@ function mouseToHex(event) {
 }
 
 
-// ============================================================
-// 点击检测单位
-// ============================================================
+function unitAtHex(q, r) {
+
+    return (
+        units.find(
+            unit =>
+                Number(unit.q) ===
+                Number(q)
+                &&
+                Number(unit.r) ===
+                Number(r)
+        )
+        ??
+        null
+    );
+}
+
 
 function findUnit(event) {
-
-    const mouse =
-        mousePosition(
-            event
-        );
-
-
-    if (
-        typeof selection.findUnitAt ===
-        "function"
-    ) {
-
-        try {
-
-            const unit =
-                selection.findUnitAt(
-
-                    mouse.x,
-
-                    mouse.y,
-
-                    units,
-
-                    camera,
-
-                    renderer
-                );
-
-
-            if (unit) {
-
-                return unit;
-            }
-
-        }
-
-        catch (error) {
-
-            console.warn(
-                "findUnitAt:",
-                error
-            );
-        }
-    }
-
 
     const hex =
         mouseToHex(
             event
         );
 
-
     if (!hex) {
-
         return null;
     }
-
 
     return unitAtHex(
         hex.q,
@@ -2028,425 +1101,56 @@ function findUnit(event) {
 
 
 // ============================================================
-// Reachable 查询
+// 玩家移动
 // ============================================================
 
-function reachableAt(
-    q,
-    r
-) {
-
-    const key =
-        `${q},${r}`;
-
-
-    const sources = [
-
-        movementSystem.reachable,
-
-        movementSystem.reachableHexes,
-
-        renderer.reachable,
-
-        renderer.reachableHexes
-    ];
-
-
-    for (
-        const source of sources
-    ) {
-
-        if (!source) {
-
-            continue;
-        }
-
-
-        if (
-            source instanceof Map
-        ) {
-
-            if (
-                source.has(key)
-            ) {
-
-                return source.get(
-                    key
-                );
-            }
-
-
-            /*
-             * 某些 MovementSystem
-             * 使用对象作为 Map key。
-             */
-
-            for (
-                const [hex, value]
-                of source.entries()
-            ) {
-
-                if (
-                    Number(hex?.q) ===
-                    Number(q)
-
-                    &&
-
-                    Number(hex?.r) ===
-                    Number(r)
-                ) {
-
-                    return value;
-                }
-            }
-        }
-
-
-        else if (
-            typeof source ===
-            "object"
-
-            &&
-
-            Object.prototype
-                .hasOwnProperty
-                .call(
-                    source,
-                    key
-                )
-        ) {
-
-            return source[key];
-        }
-    }
-
-
-    return null;
-}
-
-
-// ============================================================
-// 移动成本
-// ============================================================
-
-function movementCost(data) {
+function playerMove(q, r) {
 
     if (
-        data == null
+        !selectedUnit ||
+        !playerCanControlUnit(
+            selectedUnit
+        )
     ) {
-
-        return null;
+        return false;
     }
-
 
     if (
-        typeof data ===
-        "number"
-    ) {
-
-        return data;
-    }
-
-
-    if (
-        data === true
-    ) {
-
-        return 1;
-    }
-
-
-    const values = [
-
-        data.cost,
-
-        data.totalCost,
-
-        data.apCost,
-
-        data.distance,
-
-        data.g
-    ];
-
-
-    for (
-        const value of values
-    ) {
-
-        const number =
-            Number(value);
-
-
-        if (
-            Number.isFinite(
-                number
+        !movementSystem
+            .canMoveTo(
+                q,
+                r
             )
-        ) {
-
-            return number;
-        }
-    }
-
-
-    return null;
-}
-
-
-// ============================================================
-// 移动单位
-// ============================================================
-
-function moveSelectedUnit(
-    q,
-    r
-) {
-
-    if (
-        !selectedUnit
     ) {
-
         return false;
     }
 
-
     if (
-        !canControl(
-            selectedUnit
-        )
+        unitAtHex(q, r)
     ) {
-
         return false;
     }
 
-
-    if (
-        Number(selectedUnit.q) ===
-        Number(q)
-
-        &&
-
-        Number(selectedUnit.r) ===
-        Number(r)
-    ) {
-
-        return false;
-    }
-
-
-    /*
-     * 目标 Hex 有单位。
-     */
-
-    if (
-        unitAtHex(
-            q,
-            r
-        )
-    ) {
-
-        return false;
-    }
-
-
-    const data =
-        reachableAt(
-            q,
-            r
-        );
-
-
-    if (
-        data == null
-    ) {
-
-        return false;
-    }
-
-
-    const cost =
-        movementCost(
-            data
-        );
-
-
-    if (
-        cost == null ||
-        cost >
-        getAP(selectedUnit)
-    ) {
-
-        return false;
-    }
-
-
-    const oldQ =
-        selectedUnit.q;
-
-
-    const oldR =
-        selectedUnit.r;
-
-
-    const oldAP =
-        getAP(
-            selectedUnit
-        );
-
-
-    let systemMoved =
-        false;
-
-
-    if (
-        typeof movementSystem.moveUnit ===
-        "function"
-    ) {
-
-        try {
-
-            const result =
-                movementSystem.moveUnit(
-
-                    selectedUnit,
-
-                    q,
-
-                    r,
-
-                    units
-                );
-
-
-            systemMoved =
-                result !== false;
-
-        }
-
-        catch (error) {
-
-            console.warn(
-                "moveUnit:",
-                error
+    const result =
+        movementSystem
+            .moveTo(
+                q,
+                r
             );
-        }
+
+    if (!result) {
+        return false;
     }
-
-
-    else if (
-        typeof movementSystem.moveTo ===
-        "function"
-    ) {
-
-        try {
-
-            const result =
-                movementSystem.moveTo(
-
-                    selectedUnit,
-
-                    q,
-
-                    r,
-
-                    units
-                );
-
-
-            systemMoved =
-                result !== false;
-
-        }
-
-        catch (error) {
-
-            console.warn(
-                "moveTo:",
-                error
-            );
-        }
-    }
-
-
-    /*
-     * MovementSystem 没有改变坐标，
-     * main.js 自己改变。
-     */
-
-    if (
-        Number(selectedUnit.q) ===
-        Number(oldQ)
-
-        &&
-
-        Number(selectedUnit.r) ===
-        Number(oldR)
-    ) {
-
-        selectedUnit.q =
-            Number(q);
-
-
-        selectedUnit.r =
-            Number(r);
-    }
-
-
-    /*
-     * AP 同步。
-     */
-
-    const systemAP =
-        Number(
-            selectedUnit.movementPoints
-        );
-
-
-    if (
-        systemMoved &&
-        Number.isFinite(systemAP) &&
-        systemAP < oldAP
-    ) {
-
-        setAP(
-            selectedUnit,
-            systemAP
-        );
-    }
-
-    else {
-
-        setAP(
-            selectedUnit,
-            oldAP - cost
-        );
-    }
-
-
-    console.log(
-        "移动：",
-        `${oldQ},${oldR}`,
-        "→",
-        `${q},${r}`,
-        "成本：",
-        cost,
-        "剩余 AP：",
-        getAP(selectedUnit)
-    );
-
 
     showUnitInfo(
         selectedUnit
     );
 
-
     calculateReachable(
         selectedUnit
     );
 
-
     render();
-
 
     return true;
 }
@@ -2460,19 +1164,18 @@ canvas.addEventListener(
     "click",
     event => {
 
-        /*
-         * 刚刚拖动过地图，
-         * 不执行点击。
-         */
-
-        if (dragMoved) {
-
-            dragMoved =
-                false;
-
+        if (
+            aiRunning
+        ) {
             return;
         }
 
+        if (dragMoved) {
+
+            dragMoved = false;
+
+            return;
+        }
 
         const clickedUnit =
             findUnit(
@@ -2480,82 +1183,81 @@ canvas.addEventListener(
             );
 
 
-        // ====================================================
-        // 点击到了单位
-        // ====================================================
+        // 点击单位
 
         if (clickedUnit) {
 
-
             /*
-             * 已经选择了我方单位，
-             * 点击的是敌军。
-             *
-             * 优先尝试攻击。
+             * 已选中我方单位，
+             * 再点击敌军：
+             * 尝试攻击。
              */
 
             if (
-                selectedUnit
-
-                &&
-
-                selectedUnit !==
-                clickedUnit
-
-                &&
-
-                isEnemy(
+                selectedUnit &&
+                playerCanControlUnit(
+                    selectedUnit
+                ) &&
+                combatSystem.isEnemy(
                     selectedUnit,
                     clickedUnit
                 )
             ) {
 
                 if (
-                    attackUnit(
+                    playerAttack(
                         selectedUnit,
                         clickedUnit
                     )
                 ) {
-
                     return;
                 }
 
-
                 /*
-                 * 敌人在射程外。
-                 *
-                 * 仍然允许查看敌军信息，
-                 * 但不会切换为可操作单位。
+                 * 射程外时仅查看敌军。
                  */
 
                 showUnitInfo(
                     clickedUnit
                 );
 
+                return;
+            }
 
-                render();
 
+            /*
+             * 我方单位
+             */
+
+            if (
+                getUnitSide(
+                    clickedUnit
+                ) ===
+                getPlayerSide()
+            ) {
+
+                selectUnit(
+                    clickedUnit
+                );
 
                 return;
             }
 
 
             /*
-             * 点击友军或没有选择单位。
+             * 单独点击敌军：
+             * 查看信息。
              */
 
-            selectUnit(
+            showUnitInfo(
                 clickedUnit
             );
-
 
             return;
         }
 
 
-        // ====================================================
-        // 点击空地
-        // ====================================================
+        // 点击空地移动
 
         if (
             selectedUnit
@@ -2566,24 +1268,16 @@ canvas.addEventListener(
                     event
                 );
 
-
             if (
                 hex &&
-                moveSelectedUnit(
+                playerMove(
                     hex.q,
                     hex.r
                 )
             ) {
-
                 return;
             }
         }
-
-
-        /*
-         * 不是移动目标，
-         * 清除选择。
-         */
 
         clearSelection();
 
@@ -2593,7 +1287,7 @@ canvas.addEventListener(
 
 
 // ============================================================
-// 地图拖动
+// 拖动
 // ============================================================
 
 canvas.addEventListener(
@@ -2603,22 +1297,15 @@ canvas.addEventListener(
         if (
             event.button !== 0
         ) {
-
             return;
         }
 
+        dragging = true;
 
-        dragging =
-            true;
-
-
-        dragMoved =
-            false;
-
+        dragMoved = false;
 
         lastMouseX =
             event.clientX;
-
 
         lastMouseY =
             event.clientY;
@@ -2630,37 +1317,26 @@ window.addEventListener(
     "mousemove",
     event => {
 
-        if (
-            !dragging
-        ) {
-
+        if (!dragging) {
             return;
         }
-
 
         const dx =
             event.clientX -
             lastMouseX;
 
-
         const dy =
             event.clientY -
             lastMouseY;
-
 
         if (
             Math.abs(dx) > 3 ||
             Math.abs(dy) > 3
         ) {
-
-            dragMoved =
-                true;
+            dragMoved = true;
         }
 
-
-        if (
-            dragMoved
-        ) {
+        if (dragMoved) {
 
             if (
                 typeof camera.pan ===
@@ -2675,62 +1351,44 @@ window.addEventListener(
 
             else {
 
-                if (
-                    "x" in camera
-                ) {
-
+                if ("x" in camera) {
                     camera.x =
                         Number(
                             camera.x ?? 0
-                        ) +
-                        dx;
+                        ) + dx;
                 }
 
-
-                if (
-                    "y" in camera
-                ) {
-
+                if ("y" in camera) {
                     camera.y =
                         Number(
                             camera.y ?? 0
-                        ) +
-                        dy;
+                        ) + dy;
                 }
-
 
                 if (
                     "offsetX" in camera
                 ) {
-
                     camera.offsetX =
                         Number(
                             camera.offsetX ?? 0
-                        ) +
-                        dx;
+                        ) + dx;
                 }
-
 
                 if (
                     "offsetY" in camera
                 ) {
-
                     camera.offsetY =
                         Number(
                             camera.offsetY ?? 0
-                        ) +
-                        dy;
+                        ) + dy;
                 }
             }
-
 
             render();
         }
 
-
         lastMouseX =
             event.clientX;
-
 
         lastMouseY =
             event.clientY;
@@ -2742,15 +1400,10 @@ window.addEventListener(
     "mouseup",
     () => {
 
-        dragging =
-            false;
+        dragging = false;
     }
 );
 
-
-// ============================================================
-// 右键取消选择
-// ============================================================
 
 canvas.addEventListener(
     "contextmenu",
@@ -2758,9 +1411,11 @@ canvas.addEventListener(
 
         event.preventDefault();
 
+        if (aiRunning) {
+            return;
+        }
 
         clearSelection();
-
 
         render();
     }
@@ -2777,40 +1432,27 @@ canvas.addEventListener(
 
         event.preventDefault();
 
-
         const oldZoom =
             Number(
                 camera.zoom ?? 1
             );
 
-
-        const factor =
-
-            event.deltaY < 0
-
-                ? 1.1
-
-                : 0.9;
-
-
         camera.zoom =
             Math.max(
-
                 0.35,
-
                 Math.min(
-
                     3,
-
                     oldZoom *
-                    factor
+                    (
+                        event.deltaY < 0
+                            ? 1.1
+                            : 0.9
+                    )
                 )
             );
 
-
         render();
     },
-
     {
         passive: false
     }
@@ -2818,97 +1460,160 @@ canvas.addEventListener(
 
 
 // ============================================================
-// 结束当前行动阶段
+// 回合 UI
 // ============================================================
 
-function endCurrentPhase() {
+function updateTurnUI() {
+
+    if (!turnSystem) {
+        return;
+    }
+
+    const number =
+        turnSystem.turn ??
+        turnSystem.turnNumber ??
+        1;
+
+    if (turnNumber) {
+
+        turnNumber.textContent =
+            `第${number}回合`;
+    }
+
+    if (turnPhase) {
+
+        if (aiRunning) {
+
+            turnPhase.textContent =
+                "AI行动";
+
+        }
+
+        else {
+
+            turnPhase.textContent =
+                isPlayerPhase()
+                    ? "我方行动"
+                    : "敌方行动";
+        }
+    }
+
+    if (endPhaseButton) {
+
+        if (aiRunning) {
+
+            endPhaseButton.textContent =
+                "AI行动中……";
+
+            endPhaseButton.disabled =
+                true;
+
+        }
+
+        else {
+
+            endPhaseButton.textContent =
+                "结束我方行动";
+
+            endPhaseButton.disabled =
+                !isPlayerPhase();
+        }
+    }
 
     if (
-        !turnSystem
+        turnInfo &&
+        typeof turnSystem
+            .getHeaderText ===
+        "function"
     ) {
+
+        turnInfo.textContent =
+            turnSystem
+                .getHeaderText();
+    }
+
+    if (
+        turnTime &&
+        typeof turnSystem
+            .getTurnTimeRange ===
+        "function"
+    ) {
+
+        turnTime.textContent =
+            turnSystem
+                .getTurnTimeRange();
+    }
+}
+
+
+// ============================================================
+// AP 恢复
+// ============================================================
+
+function resetSideAP(side) {
+
+    for (const unit of units) {
+
+        if (
+            getUnitSide(unit) !==
+            side
+        ) {
+            continue;
+        }
+
+        setAP(
+            unit,
+            getMaxAP(unit)
+        );
+
+        unit.suppression =
+            Math.max(
+                0,
+                Number(
+                    unit.suppression ??
+                    0
+                ) - 10
+            );
+    }
+}
+
+
+// ============================================================
+// 进入下一阶段
+// ============================================================
+
+function advancePhase() {
+
+    if (
+        typeof turnSystem
+            .endPhase ===
+        "function"
+    ) {
+
+        turnSystem.endPhase();
 
         return;
     }
 
 
-    const oldPhase =
-        currentPhase();
-
-
-    clearSelection();
-
-
     /*
-     * 优先使用 TurnSystem。
+     * TurnSystem 后备逻辑。
      */
 
     if (
-        typeof turnSystem.endPhase ===
-        "function"
-    ) {
-
-        try {
-
-            turnSystem.endPhase();
-
-
-            /*
-             * 新行动方恢复 AP。
-             */
-
-            resetPhaseUnits(
-                currentPhase()
-            );
-
-
-            updateTurnUI();
-
-
-            render();
-
-
-            console.log(
-                oldPhase,
-                "→",
-                currentPhase()
-            );
-
-
-            return;
-
-        }
-
-        catch (error) {
-
-            console.error(
-                "TurnSystem.endPhase:",
-                error
-            );
-        }
-    }
-
-
-    /*
-     * ========================================================
-     * 后备回合系统
-     * ========================================================
-     */
-
-
-    if (
-        oldPhase ===
+        currentPhase() ===
         "german"
     ) {
 
         turnSystem.phase =
             "soviet";
+
     }
 
     else {
 
         turnSystem.phase =
             "german";
-
 
         if (
             Number.isFinite(
@@ -2917,7 +1622,6 @@ function endCurrentPhase() {
                 )
             )
         ) {
-
             turnSystem.turn++;
         }
 
@@ -2928,44 +1632,213 @@ function endCurrentPhase() {
                 )
             )
         ) {
-
             turnSystem.turnNumber++;
         }
     }
-
-
-    resetPhaseUnits(
-        currentPhase()
-    );
-
-
-    updateTurnUI();
-
-
-    render();
 }
 
 
 // ============================================================
-// 结束行动按钮
+// AI 回合
 // ============================================================
 
-if (
-    endPhaseButton
-) {
+async function runAITurn() {
 
-    endPhaseButton.addEventListener(
-        "click",
-        event => {
+    if (aiRunning) {
+        return;
+    }
 
-            event.preventDefault();
+    aiRunning = true;
 
-            event.stopPropagation();
+    clearSelection();
+
+    resetSideAP(
+        getAISide()
+    );
+
+    updateTurnUI();
+
+    render();
 
 
-            endCurrentPhase();
+    console.log(
+        "AI行动开始：",
+        getAISide()
+    );
+
+
+    await aiSystem.runTurn(
+
+        getAISide(),
+
+        units,
+
+        {
+
+            onUnitStart(unit) {
+
+                selectedUnit =
+                    unit;
+
+                if (
+                    typeof renderer
+                        .setSelectedUnit ===
+                    "function"
+                ) {
+
+                    renderer
+                        .setSelectedUnit(
+                            unit
+                        );
+                }
+
+                showUnitInfo(
+                    unit
+                );
+
+                render();
+            },
+
+
+            onMove(info) {
+
+                console.log(
+                    "AI移动：",
+                    info.unit.id,
+                    `${info.oldQ},${info.oldR}`,
+                    "→",
+                    `${info.q},${info.r}`
+                );
+
+                render();
+            },
+
+
+            onAttack(result) {
+
+                console.log(
+                    "AI攻击：",
+                    result.attacker.id,
+                    "→",
+                    result.defender.id,
+                    "伤害：",
+                    result.damage
+                );
+
+                if (
+                    result.destroyed
+                ) {
+                    destroyUnit(
+                        result.defender
+                    );
+                }
+
+                render();
+            },
+
+
+            onUnitEnd(unit) {
+
+                showUnitInfo(
+                    unit
+                );
+
+                render();
+            }
         }
     );
+
+
+    selectedUnit =
+        null;
+
+    aiRunning =
+        false;
+
+
+    /*
+     * AI行动结束，
+     * 自动进入下一阶段。
+     */
+
+    advancePhase();
+
+
+    /*
+     * 玩家下一阶段恢复 AP。
+     */
+
+    resetSideAP(
+        getPlayerSide()
+    );
+
+
+    clearSelection();
+
+    updateTurnUI();
+
+    render();
+
+
+    console.log(
+        "AI行动结束"
+    );
+}
+
+
+// ============================================================
+// 玩家结束行动
+// ============================================================
+
+async function endPlayerPhase() {
+
+    if (
+        aiRunning ||
+        !isPlayerPhase()
+    ) {
+        return;
+    }
+
+    clearSelection();
+
+    advancePhase();
+
+    updateTurnUI();
+
+    render();
+
+
+    /*
+     * 进入 AI 阶段。
+     */
+
+    if (
+        isAIPhase()
+    ) {
+
+        await runAITurn();
+    }
+}
+
+
+// ============================================================
+// 按钮
+// ============================================================
+
+if (endPhaseButton) {
+
+    endPhaseButton
+        .addEventListener(
+            "click",
+            event => {
+
+                event.preventDefault();
+
+                event.stopPropagation();
+
+                endPlayerPhase();
+            }
+        );
 }
 
 
@@ -2977,9 +1850,9 @@ window.addEventListener(
     "keydown",
     event => {
 
-        /*
-         * ESC
-         */
+        if (aiRunning) {
+            return;
+        }
 
         if (
             event.key ===
@@ -2993,137 +1866,95 @@ window.addEventListener(
             return;
         }
 
-
-        /*
-         * E
-         */
-
         if (
-            event.key.toLowerCase() ===
+            event.key
+                .toLowerCase() ===
             "e"
         ) {
 
-            endCurrentPhase();
+            endPlayerPhase();
         }
     }
 );
 
 
 // ============================================================
-// 场景单位提取
+// 场景
 // ============================================================
 
 function extractUnits(data) {
 
     if (!data) {
-
         return [];
     }
-
 
     if (
         Array.isArray(data)
     ) {
-
         return data;
     }
-
 
     if (
         Array.isArray(
             data.units
         )
     ) {
-
         return data.units;
     }
 
-
-    const result =
-        [];
-
+    const result = [];
 
     const german =
-
         data.germanUnits ??
-
         data.german?.units ??
-
         data.factions?.german?.units ??
-
         data.factions?.GER?.units;
 
-
     const soviet =
-
         data.sovietUnits ??
-
         data.soviet?.units ??
-
         data.factions?.soviet?.units ??
-
         data.factions?.USSR?.units;
 
-
     if (
-        Array.isArray(
-            german
-        )
+        Array.isArray(german)
     ) {
 
-        for (
-            const unit of german
-        ) {
+        for (const unit of german) {
 
             result.push({
 
                 ...unit,
 
                 side:
-
                     unit.side ??
-
                     unit.faction ??
-
                     "german"
             });
         }
     }
 
-
     if (
-        Array.isArray(
-            soviet
-        )
+        Array.isArray(soviet)
     ) {
 
-        for (
-            const unit of soviet
-        ) {
+        for (const unit of soviet) {
 
             result.push({
 
                 ...unit,
 
                 side:
-
                     unit.side ??
-
                     unit.faction ??
-
                     "soviet"
             });
         }
     }
 
-
     return result;
 }
 
-
-// ============================================================
-// 场景读取
-// ============================================================
 
 async function loadScenario() {
 
@@ -3138,49 +1969,33 @@ async function loadScenario() {
         "./scenario.json"
     ];
 
-
-    for (
-        const path of paths
-    ) {
+    for (const path of paths) {
 
         try {
 
             const response =
-                await fetch(
-                    path
-                );
+                await fetch(path);
 
-
-            if (
-                !response.ok
-            ) {
-
+            if (!response.ok) {
                 continue;
             }
-
 
             const data =
                 await response.json();
 
-
             console.log(
-                "场景读取成功：",
+                "场景加载成功：",
                 path
             );
 
-
             return data;
-
         }
 
         catch (error) {
 
-            /*
-             * 尝试下一个文件。
-             */
+            // 尝试下一个
         }
     }
-
 
     return null;
 }
@@ -3195,29 +2010,14 @@ function fallbackUnits() {
     return [
 
         {
-            id:
-                "GER_ARM_01",
-
-            nameZh:
-                "德军第1装甲团",
-
-            typeZh:
-                "装甲",
-
-            side:
-                "german",
-
-            faction:
-                "GER",
-
+            id: "GER_ARM_01",
+            nameZh: "德军第1装甲团",
+            typeZh: "装甲",
+            side: "german",
             q: 14,
             r: 12,
 
-            actionPoints: 8,
             maxActionPoints: 8,
-
-            movementPoints: 8,
-            maxMovementPoints: 8,
 
             strength: 120,
             maxStrength: 120,
@@ -3227,36 +2027,18 @@ function fallbackUnits() {
             range: 1,
 
             morale: 90,
-            suppression: 0,
-            fatigue: 0,
             ammunition: 100
         },
 
-
         {
-            id:
-                "GER_INF_01",
-
-            nameZh:
-                "德军第1步兵团",
-
-            typeZh:
-                "步兵",
-
-            side:
-                "german",
-
-            faction:
-                "GER",
-
+            id: "GER_INF_01",
+            nameZh: "德军第1步兵团",
+            typeZh: "步兵",
+            side: "german",
             q: 11,
             r: 14,
 
-            actionPoints: 6,
             maxActionPoints: 6,
-
-            movementPoints: 6,
-            maxMovementPoints: 6,
 
             strength: 160,
             maxStrength: 160,
@@ -3266,36 +2048,18 @@ function fallbackUnits() {
             range: 1,
 
             morale: 80,
-            suppression: 0,
-            fatigue: 0,
             ammunition: 100
         },
 
-
         {
-            id:
-                "SOV_ARM_01",
-
-            nameZh:
-                "苏军第1坦克团",
-
-            typeZh:
-                "装甲",
-
-            side:
-                "soviet",
-
-            faction:
-                "USSR",
-
+            id: "SOV_ARM_01",
+            nameZh: "苏军第1坦克团",
+            typeZh: "装甲",
+            side: "soviet",
             q: 30,
             r: 15,
 
-            actionPoints: 8,
             maxActionPoints: 8,
-
-            movementPoints: 8,
-            maxMovementPoints: 8,
 
             strength: 120,
             maxStrength: 120,
@@ -3305,36 +2069,18 @@ function fallbackUnits() {
             range: 1,
 
             morale: 80,
-            suppression: 0,
-            fatigue: 0,
             ammunition: 100
         },
 
-
         {
-            id:
-                "SOV_INF_01",
-
-            nameZh:
-                "苏军第1步兵团",
-
-            typeZh:
-                "步兵",
-
-            side:
-                "soviet",
-
-            faction:
-                "USSR",
-
+            id: "SOV_INF_01",
+            nameZh: "苏军第1步兵团",
+            typeZh: "步兵",
+            side: "soviet",
             q: 27,
             r: 15,
 
-            actionPoints: 6,
             maxActionPoints: 6,
-
-            movementPoints: 6,
-            maxMovementPoints: 6,
 
             strength: 160,
             maxStrength: 160,
@@ -3344,8 +2090,6 @@ function fallbackUnits() {
             range: 1,
 
             morale: 80,
-            suppression: 0,
-            fatigue: 0,
             ammunition: 100
         }
     ];
@@ -3363,18 +2107,15 @@ function applyScenario(data) {
             data
         );
 
-
     if (
         units.length === 0 &&
         Array.isArray(
             world.units
         )
     ) {
-
         units =
             world.units;
     }
-
 
     if (
         units.length === 0
@@ -3384,39 +2125,20 @@ function applyScenario(data) {
             "没有读取到场景单位，使用测试单位。"
         );
 
-
         units =
             fallbackUnits();
     }
 
-
     initializeUnits();
-
 
     renderer.units =
         units;
 
-
-    renderer.selection =
-        selection;
-
-
-    renderer.movementSystem =
-        movementSystem;
-
-
     selection.units =
         units;
 
-
     gameState.units =
         units;
-
-
-    console.log(
-        "单位数量：",
-        units.length
-    );
 }
 
 
@@ -3434,14 +2156,10 @@ function initializeCamera() {
         try {
 
             camera.fitToMap(
-
                 world,
-
                 canvas.width,
-
                 canvas.height
             );
-
 
             return;
 
@@ -3456,7 +2174,6 @@ function initializeCamera() {
         }
     }
 
-
     if (
         !Number.isFinite(
             Number(
@@ -3464,10 +2181,36 @@ function initializeCamera() {
             )
         )
     ) {
-
-        camera.zoom =
-            1;
+        camera.zoom = 1;
     }
+}
+
+
+// ============================================================
+// 回合系统
+// ============================================================
+
+function initializeTurnSystem() {
+
+    turnSystem =
+        new TurnSystem({
+
+            units,
+
+            year: 1941,
+            month: 6,
+            day: 26,
+
+            hour: 8,
+            minute: 0,
+
+            hoursPerTurn: 2,
+
+            startingPhase:
+                "german"
+        });
+
+    updateTurnUI();
 }
 
 
@@ -3475,90 +2218,81 @@ function initializeCamera() {
 // 开始游戏
 // ============================================================
 
-function startGame() {
+async function startGame() {
+
+    updateUnitRelations();
+
+    /*
+     * 如果玩家选择苏军，
+     * 但第一阶段是德军，
+     * 那么德军就是 AI，
+     * 自动先走。
+     */
+
+    resetSideAP(
+        currentPhase()
+    );
 
     clearSelection();
 
-
     updateTurnUI();
-
 
     render();
 
 
     console.log(
-        "=========================="
+        "玩家：",
+        getPlayerSide()
     );
-
 
     console.log(
-        "东线 1941 V0.7"
+        "AI：",
+        getAISide()
     );
 
 
-    console.log(
-        "当前行动方：",
-        phaseName()
-    );
+    if (
+        isAIPhase()
+    ) {
 
-
-    console.log(
-        "单位数量：",
-        units.length
-    );
-
-
-    console.log(
-        "=========================="
-    );
+        await runAITurn();
+    }
 }
 
 
 // ============================================================
-// 初始化游戏
+// 初始化
 // ============================================================
 
 async function initializeGame() {
 
     console.log(
-        "正在初始化《东线 1941：杜布诺》 V0.7"
+        "东线 1941 V0.8 初始化"
     );
-
 
     resizeCanvas();
 
-
     const scenario =
         await loadScenario();
-
 
     applyScenario(
         scenario
     );
 
-
     initializeCamera();
 
-
     initializeTurnSystem();
-
 
     render();
 
 
     /*
-     * 保留阵营选择界面。
-     *
-     * 但阵营选择现在只代表开局身份，
-     * 不再锁定另一方单位。
-     *
-     * 因此进入苏军行动阶段后，
-     * 苏军可以正常操作。
+     * 玩家选择阵营。
      */
 
     if (
-        factionSelection &&
-        typeof factionSelection.show ===
+        typeof factionSelection
+            .show ===
         "function"
     ) {
 
@@ -3572,6 +2306,14 @@ async function initializeGame() {
 
     else {
 
+        /*
+         * 后备：
+         * 默认德军。
+         */
+
+        gameState.playerSide =
+            "german";
+
         startGame();
     }
 }
@@ -3584,77 +2326,35 @@ async function initializeGame() {
 window.EasternFront1941 = {
 
     world,
-
     camera,
-
     renderer,
-
     gameState,
 
-    selection,
-
     movementSystem,
-
+    combatSystem,
+    aiSystem,
 
     getUnits() {
-
         return units;
     },
 
+    getPlayerSide,
 
-    getSelectedUnit() {
-
-        return selectedUnit;
-    },
-
-
-    getTurnSystem() {
-
-        return turnSystem;
-    },
-
+    getAISide,
 
     getPhase() {
-
         return currentPhase();
     },
 
+    getSelectedUnit() {
+        return selectedUnit;
+    },
 
     render,
 
-
-    endPhase() {
-
-        endCurrentPhase();
+    async runAI() {
+        await runAITurn();
     },
-
-
-    selectUnit(id) {
-
-        const unit =
-            units.find(
-
-                item =>
-
-                    String(item.id) ===
-                    String(id)
-            );
-
-
-        if (unit) {
-
-            selectUnit(
-                unit
-            );
-        }
-
-
-        return (
-            unit ??
-            null
-        );
-    },
-
 
     attack(
         attackerId,
@@ -3668,7 +2368,6 @@ window.EasternFront1941 = {
                     String(attackerId)
             );
 
-
         const defender =
             units.find(
                 unit =>
@@ -3676,28 +2375,17 @@ window.EasternFront1941 = {
                     String(defenderId)
             );
 
-
         if (
             !attacker ||
             !defender
         ) {
-
-            return false;
+            return null;
         }
 
-
-        return attackUnit(
+        return combatSystem.attack(
             attacker,
             defender
         );
-    },
-
-
-    clearSelection() {
-
-        clearSelection();
-
-        render();
     }
 };
 
@@ -3707,9 +2395,7 @@ window.EasternFront1941 = {
 // ============================================================
 
 initializeGame()
-
     .catch(
-
         error => {
 
             console.error(
@@ -3717,21 +2403,16 @@ initializeGame()
                 error
             );
 
-
-            if (
-                unitInfo
-            ) {
+            if (unitInfo) {
 
                 unitInfo.innerHTML = `
-
                     <div class="unit-title">
                         游戏初始化失败
                     </div>
 
                     <p>
-                        请查看浏览器 Console。
+                        ${String(error)}
                     </p>
-
                 `;
             }
         }
@@ -3739,5 +2420,5 @@ initializeGame()
 
 
 console.log(
-    "main.js V0.7 已加载"
+    "main.js V0.8 已加载"
 );
