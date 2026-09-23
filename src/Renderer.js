@@ -1234,7 +1234,7 @@ export class Renderer {
 
             ctx.fillStyle =
                 this.factionColor(
-                    unit.faction
+                    unit
                 );
 
 
