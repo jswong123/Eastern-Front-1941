@@ -2,15 +2,17 @@ export class FactionSelection {
 
     constructor(gameState) {
 
-        this.gameState =
-            gameState;
-
+        this.gameState = gameState;
         this.overlay = null;
 
     }
 
 
-    show(onStart) {
+    show(onStart = null) {
+
+        // 防止重复创建阵营选择界面
+        this.close();
+
 
         this.overlay =
             document.createElement("div");
@@ -31,7 +33,7 @@ export class FactionSelection {
                 alignItems: "center",
                 justifyContent: "center",
                 fontFamily:
-                    "FangSong, serif"
+                    "FangSong, 仿宋, SimSun, serif"
             }
         );
 
@@ -95,6 +97,7 @@ export class FactionSelection {
 
             <button
                 id="observerButton"
+                type="button"
                 style="
                     margin-top:30px;
                     padding:10px 24px;
@@ -122,63 +125,125 @@ export class FactionSelection {
         `;
 
 
-        this.overlay.appendChild(
-            panel
-        );
+        this.overlay.appendChild(panel);
+
+        document.body.appendChild(this.overlay);
 
 
-        document.body.appendChild(
-            this.overlay
-        );
+        // ============================
+        // 阵营按钮
+        // ============================
 
-
-        panel
-            .querySelectorAll(
+        const factionButtons =
+            panel.querySelectorAll(
                 "[data-faction]"
-            )
-            .forEach(
-                button => {
+            );
 
-                    button.addEventListener(
-                        "click",
-                        () => {
 
-                            const faction =
-                                button.dataset.faction;
+        factionButtons.forEach(
+            button => {
+
+                button.addEventListener(
+                    "click",
+                    () => {
+
+                        const faction =
+                            button.dataset.faction;
+
+
+                        // 设置玩家阵营
+                        if (
+                            this.gameState &&
+                            typeof this.gameState
+                                .setPlayerFaction === "function"
+                        ) {
 
                             this.gameState
                                 .setPlayerFaction(
                                     faction
                                 );
 
-                            this.close();
+                        } else {
 
-                            onStart();
+                            console.error(
+                                "GameState 缺少 setPlayerFaction()"
+                            );
+
+                            return;
 
                         }
-                    );
 
-                }
+
+                        this.close();
+
+
+                        // 启动游戏
+                        if (
+                            typeof onStart === "function"
+                        ) {
+
+                            onStart(faction);
+
+                        }
+
+                    }
+                );
+
+            }
+        );
+
+
+        // ============================
+        // 观察员模式
+        // ============================
+
+        const observerButton =
+            panel.querySelector(
+                "#observerButton"
             );
 
 
-        panel
-            .querySelector(
-                "#observerButton"
-            )
-            .addEventListener(
+        if (observerButton) {
+
+            observerButton.addEventListener(
                 "click",
                 () => {
 
-                    this.gameState
-                        .setObserverMode();
+                    if (
+                        this.gameState &&
+                        typeof this.gameState
+                            .setObserverMode === "function"
+                    ) {
+
+                        this.gameState
+                            .setObserverMode();
+
+                    } else {
+
+                        console.error(
+                            "GameState 缺少 setObserverMode()"
+                        );
+
+                        return;
+
+                    }
+
 
                     this.close();
 
-                    onStart();
+
+                    if (
+                        typeof onStart === "function"
+                    ) {
+
+                        onStart("OBSERVER");
+
+                    }
 
                 }
             );
+
+        }
 
     }
 
@@ -199,6 +264,7 @@ export class FactionSelection {
         return `
 
             <button
+                type="button"
                 data-faction="${faction}"
                 style="
                     width:300px;
@@ -257,7 +323,16 @@ export class FactionSelection {
             return;
         }
 
-        this.overlay.remove();
+
+        if (this.overlay.parentNode) {
+
+            this.overlay.parentNode
+                .removeChild(
+                    this.overlay
+                );
+
+        }
+
 
         this.overlay = null;
 
