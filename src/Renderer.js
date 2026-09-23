@@ -886,36 +886,61 @@ export class Renderer {
     // 单位颜色
     // ========================================================
 
-    factionColor(
-        faction
+    factionColor(unitOrFaction) {
+
+    // 新版：允许直接传入 unit
+    if (
+        unitOrFaction &&
+        typeof unitOrFaction === "object"
     ) {
 
-        if (
-            faction === "GER" ||
-            faction === "germany" ||
-            faction === "German"
-        ) {
-
-            return "#8798a6";
-
+        // 优先使用 main.js 设置的敌我颜色
+        if (unitOrFaction.displayColor) {
+            return unitOrFaction.displayColor;
         }
 
+        const relation =
+            String(
+                unitOrFaction.relation ?? ""
+            ).toLowerCase();
 
-        if (
-            faction === "USSR" ||
-            faction === "soviet" ||
-            faction === "Soviet"
-        ) {
-
-            return "#c45f59";
-
+        if (relation === "friendly") {
+            return "#4f78a8";
         }
 
+        if (relation === "enemy") {
+            return "#b6534f";
+        }
 
-        return "#a9a68f";
-
+        unitOrFaction =
+            unitOrFaction.faction ??
+            unitOrFaction.side;
     }
 
+    const faction =
+        String(
+            unitOrFaction ?? ""
+        ).toLowerCase();
+
+    if (
+        faction === "ger" ||
+        faction === "german" ||
+        faction === "germany" ||
+        faction === "axis"
+    ) {
+        return "#4f78a8";
+    }
+
+    if (
+        faction === "ussr" ||
+        faction === "soviet" ||
+        faction === "redarmy"
+    ) {
+        return "#b6534f";
+    }
+
+    return "#a9a68f";
+}
 
     // ========================================================
     // 绘制军事符号
