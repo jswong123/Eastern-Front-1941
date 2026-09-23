@@ -1,42 +1,21 @@
-import {
-    WorldMap
-} from "./WorldMap.js";
-
-
-import {
-    Renderer
-} from "./Renderer.js";
-
-
-import {
-    Camera
-} from "./Camera.js";
-
-
-import {
-    UnitSelection
-} from "./UnitSelection.js";
+import { WorldMap } from "./WorldMap.js";
+import { Renderer } from "./Renderer.js";
+import { Camera } from "./Camera.js";
+import { UnitSelection } from "./UnitSelection.js";
 
 
 const canvas =
-    document.getElementById(
-        "gameCanvas"
-    );
-
+    document.getElementById("gameCanvas");
 
 const unitInfo =
-    document.getElementById(
-        "unitInfo"
-    );
+    document.getElementById("unitInfo");
 
 
 const world =
     new WorldMap();
 
-
 const camera =
     new Camera();
-
 
 const renderer =
     new Renderer(
@@ -45,14 +24,8 @@ const renderer =
     );
 
 
-/*
- * Renderer V0.1 原本自己保存 camera。
- *
- * V0.2 开始把 Camera 独立成模块。
- */
-
-renderer.camera =
-    camera;
+// V0.2 独立 Camera
+renderer.camera = camera;
 
 
 const selection =
@@ -65,25 +38,9 @@ const selection =
 let units = [];
 
 
-/*
- * 用来区分：
- *
- * 点击单位
- *
- * 和
- *
- * 拖动地图
- */
-
-let mouseDownX = 0;
-let mouseDownY = 0;
-
-let movedDuringDrag = false;
-
-
-/*
- * 加载场景
- */
+// ===============================
+// 场景加载
+// ===============================
 
 async function loadScenario() {
 
@@ -94,7 +51,6 @@ async function loadScenario() {
                 "./data/scenario.json"
             );
 
-
         if (!response.ok) {
 
             throw new Error(
@@ -103,36 +59,32 @@ async function loadScenario() {
 
         }
 
-
         const data =
             await response.json();
-
 
         units =
             data.units ?? [];
 
+        console.log(
+            "场景加载成功：",
+            units.length,
+            "个单位"
+        );
 
         render();
 
+    }
 
-    } catch (error) {
+    catch (error) {
 
         console.error(
             "战役加载失败：",
             error
         );
 
-
         unitInfo.innerHTML = `
-
-            <strong>
-                战役加载失败
-            </strong>
-
-            <p>
-                ${error.message}
-            </p>
-
+            <strong>战役加载失败</strong>
+            <p>${error.message}</p>
         `;
 
     }
@@ -140,24 +92,16 @@ async function loadScenario() {
 }
 
 
-/*
- * 主渲染
- */
+// ===============================
+// 主渲染
+// ===============================
 
 function render() {
 
-    renderer.render(
-        units
-    );
+    renderer.render(units);
 
 
-    /*
-     * 给被选择的单位增加黄色框。
-     */
-
-    if (
-        selection.selectedUnit
-    ) {
+    if (selection.selectedUnit) {
 
         drawSelection(
             selection.selectedUnit
@@ -168,9 +112,9 @@ function render() {
 }
 
 
-/*
- * 选中框
- */
+// ===============================
+// 选中框
+// ===============================
 
 function drawSelection(unit) {
 
@@ -185,34 +129,34 @@ function drawSelection(unit) {
         renderer.ctx;
 
 
-    const size =
-        38 *
+    const zoom =
         Math.max(
             0.75,
             camera.zoom
         );
 
 
+    const width =
+        66 * zoom;
+
+    const height =
+        52 * zoom;
+
+
     ctx.save();
 
 
     ctx.strokeStyle =
-        "#f1d36a";
-
+        "#f4d35e";
 
     ctx.lineWidth = 3;
 
 
     ctx.strokeRect(
-
-        position.x - size,
-
-        position.y - size * 0.72,
-
-        size * 2,
-
-        size * 1.44
-
+        position.x - width / 2,
+        position.y - height / 2,
+        width,
+        height
     );
 
 
@@ -221,9 +165,9 @@ function drawSelection(unit) {
 }
 
 
-/*
- * 浏览器尺寸变化
- */
+// ===============================
+// Canvas尺寸
+// ===============================
 
 window.addEventListener(
     "resize",
@@ -237,25 +181,18 @@ window.addEventListener(
 );
 
 
-/*
- * 鼠标按下
- */
+// ===============================
+// 地图拖动
+// ===============================
+
+let dragDistance = 0;
+
 
 canvas.addEventListener(
     "mousedown",
     event => {
 
-        mouseDownX =
-            event.clientX;
-
-
-        mouseDownY =
-            event.clientY;
-
-
-        movedDuringDrag =
-            false;
-
+        dragDistance = 0;
 
         camera.startDrag(
             event.clientX,
@@ -266,140 +203,132 @@ canvas.addEventListener(
 );
 
 
-/*
- * 鼠标移动
- */
-
 window.addEventListener(
     "mousemove",
     event => {
 
-        if (
-            !camera.dragging
-        ) {
+        if (!camera.dragging) {
 
             return;
 
         }
 
 
-        const totalDX =
+        const dx =
             event.clientX -
-            mouseDownX;
+            camera.lastX;
 
-
-        const totalDY =
+        const dy =
             event.clientY -
-            mouseDownY;
+            camera.lastY;
 
 
-        if (
-            Math.abs(totalDX) > 4 ||
-            Math.abs(totalDY) > 4
-        ) {
-
-            movedDuringDrag =
-                true;
-
-        }
+        dragDistance +=
+            Math.abs(dx) +
+            Math.abs(dy);
 
 
-        if (
-            camera.drag(
-                event.clientX,
-                event.clientY
-            )
-        ) {
+        camera.drag(
+            event.clientX,
+            event.clientY
+        );
 
-            render();
 
-        }
+        render();
 
     }
 );
 
 
-/*
- * 鼠标松开
- */
-
 window.addEventListener(
     "mouseup",
+    () => {
+
+        camera.endDrag();
+
+    }
+);
+
+
+// ===============================
+// 单位点击
+// ===============================
+
+canvas.addEventListener(
+    "click",
     event => {
 
-        if (
-            !camera.dragging
-        ) {
+        /*
+         * 如果刚刚进行了明显拖拽，
+         * 就不把它当作点击。
+         */
+
+        if (dragDistance > 8) {
+
+            dragDistance = 0;
 
             return;
 
         }
 
 
-        camera.endDrag();
+        const rect =
+            canvas.getBoundingClientRect();
 
 
-        /*
-         * 如果移动距离很小，
-         * 认为这是一次点击。
-         */
+        const mouseX =
+            event.clientX -
+            rect.left;
 
-        if (
-            !movedDuringDrag
-        ) {
+        const mouseY =
+            event.clientY -
+            rect.top;
 
-            handleMapClick(
-                event
+
+        console.log(
+            "地图点击：",
+            mouseX,
+            mouseY
+        );
+
+
+        const unit =
+            selection.findUnitAt(
+                mouseX,
+                mouseY,
+                units
+            );
+
+
+        if (unit) {
+
+            console.log(
+                "选中单位：",
+                unit
             );
 
         }
 
+        else {
+
+            console.log(
+                "未点击到单位"
+            );
+
+        }
+
+
+        selection.select(unit);
+
+        render();
+
     }
 );
 
 
-/*
- * 点击单位
- */
-
-function handleMapClick(event) {
-
-    const rect =
-        canvas
-        .getBoundingClientRect();
-
-
-    const mouseX =
-        event.clientX -
-        rect.left;
-
-
-    const mouseY =
-        event.clientY -
-        rect.top;
-
-
-    const unit =
-        selection.findUnitAt(
-            mouseX,
-            mouseY,
-            units
-        );
-
-
-    selection.select(
-        unit
-    );
-
-
-    render();
-
-}
-
-
-/*
- * 滚轮缩放
- */
+// ===============================
+// 缩放
+// ===============================
 
 canvas.addEventListener(
     "wheel",
@@ -423,10 +352,9 @@ canvas.addEventListener(
 );
 
 
-/*
- * 防止鼠标离开窗口后
- * Camera 一直保持拖动状态。
- */
+// ===============================
+// 防止拖拽锁死
+// ===============================
 
 window.addEventListener(
     "blur",
@@ -438,16 +366,16 @@ window.addEventListener(
 );
 
 
-/*
- * 错误保护
- */
+// ===============================
+// 全局错误监控
+// ===============================
 
 window.addEventListener(
     "error",
     event => {
 
         console.error(
-            "游戏运行错误：",
+            "游戏错误：",
             event.error ??
             event.message
         );
@@ -461,7 +389,7 @@ window.addEventListener(
     event => {
 
         console.error(
-            "异步运行错误：",
+            "异步错误：",
             event.reason
         );
 
@@ -469,8 +397,8 @@ window.addEventListener(
 );
 
 
-/*
- * 启动游戏
- */
+// ===============================
+// 启动
+// ===============================
 
 loadScenario();
