@@ -1,19 +1,33 @@
+// ============================================================
+// Renderer.js
+// 东线 1941
+//
+// 地图渲染系统
+// V0.4A
+//
+// 功能：
+// - 六角格地图
+// - 地形
+// - 河流
+// - 道路
+// - 铁路
+// - 城镇
+// - 军事单位
+// - 单位选中框
+// - 移动范围
+// ============================================================
+
 import {
-    hexToPixel,
     drawHexPath
 } from "./Hex.js";
-
-
-import {
-    MilitarySymbolRenderer
-} from "./MilitarySymbolRenderer.js";
 
 
 export class Renderer {
 
     constructor(
         canvas,
-        world
+        world,
+        camera
     ) {
 
         this.canvas = canvas;
@@ -22,150 +36,218 @@ export class Renderer {
             canvas.getContext("2d");
 
 
-        this.world = world;
+        this.world =
+            world;
 
 
-        this.hexSize = 28;
+        this.camera =
+            camera;
 
 
-        /*
-         * main.js 启动后会用
-         * 独立 Camera 对象替换这里。
-         */
+        // ----------------------------------------------------
+        // Hex 大小
+        // ----------------------------------------------------
 
-        this.camera = {
+        this.hexSize = 24;
 
-            x: 80,
 
-            y: 80,
+        // ----------------------------------------------------
+        // 外部系统引用
+        // ----------------------------------------------------
 
-            zoom: 1
+        this.selection = null;
+
+        this.movementSystem = null;
+
+
+        // ----------------------------------------------------
+        // 地图颜色
+        // ----------------------------------------------------
+
+        this.colors = {
+
+            plain:
+                "#b4b28f",
+
+            forest:
+                "#65705a",
+
+            marsh:
+                "#87917b",
+
+            urban:
+                "#aaa184",
+
+            water:
+                "#7693a1",
+
+            grid:
+                "#747660",
+
+            road:
+                "#a38e69",
+
+            railway:
+                "#57564c",
+
+            river:
+                "#668ba0"
 
         };
 
-
-        this.symbolRenderer =
-            new MilitarySymbolRenderer(
-                this.ctx
-            );
-
-
-        this.resize();
     }
 
 
-    // ========================================
-    // Canvas 尺寸
-    // ========================================
+    // ========================================================
+    // 清空画布
+    // ========================================================
 
-    resize() {
+    clear() {
 
-        const rect =
-            this.canvas
-                .getBoundingClientRect();
-
-
-        const ratio =
-            window.devicePixelRatio ||
-            1;
+        const ctx =
+            this.ctx;
 
 
-        this.canvas.width =
-            Math.round(
-                rect.width *
-                ratio
-            );
+        ctx.save();
 
 
-        this.canvas.height =
-            Math.round(
-                rect.height *
-                ratio
-            );
-
-
-        this.ctx.setTransform(
-            ratio,
+        ctx.setTransform(
+            1,
             0,
             0,
-            ratio,
+            1,
             0,
             0
         );
 
 
-        this.width =
-            rect.width;
+        ctx.clearRect(
+            0,
+            0,
+            this.canvas.width,
+            this.canvas.height
+        );
 
 
-        this.height =
-            rect.height;
+        ctx.fillStyle =
+            "#8f9078";
+
+
+        ctx.fillRect(
+            0,
+            0,
+            this.canvas.width,
+            this.canvas.height
+        );
+
+
+        ctx.restore();
+
     }
 
 
-    // ========================================
-    // 地形颜色
-    // ========================================
+    // ========================================================
+    // Hex → 世界坐标
+    // ========================================================
 
-    terrainColor(type) {
+    hexToWorld(
+        q,
+        r
+    ) {
 
-        switch (type) {
-
-            case "forest":
-
-                return "#6f775c";
-
-
-            case "marsh":
-
-                return "#8d9275";
+        const size =
+            this.hexSize;
 
 
-            default:
+        return {
 
-                return "#aaa987";
+            x:
+                size *
+                Math.sqrt(3) *
+                (
+                    q +
+                    r / 2
+                ),
 
-        }
+            y:
+                size *
+                1.5 *
+                r
+
+        };
+
     }
 
 
-    // ========================================
-    // Hex -> 屏幕坐标
-    // ========================================
+    // ========================================================
+    // 世界坐标 → 屏幕坐标
+    // ========================================================
+
+    worldPointToScreen(
+        x,
+        y
+    ) {
+
+        return {
+
+            x:
+                x *
+                this.camera.zoom +
+                this.camera.x,
+
+            y:
+                y *
+                this.camera.zoom +
+                this.camera.y
+
+        };
+
+    }
+
+
+    // ========================================================
+    // Hex → 屏幕坐标
+    // ========================================================
 
     worldToScreen(
         q,
         r
     ) {
 
-        const p =
-            hexToPixel(
+        const world =
+            this.hexToWorld(
                 q,
-                r,
-                this.hexSize
+                r
             );
 
 
-        return {
+        return this.worldPointToScreen(
+            world.x,
+            world.y
+        );
 
-            x:
-                this.camera.x +
-                p.x *
-                this.camera.zoom,
-
-
-            y:
-                this.camera.y +
-                p.y *
-                this.camera.zoom
-
-        };
     }
 
 
-    // ========================================
-    // 基础地形
-    // ========================================
+    // ========================================================
+    // 地形颜色
+    // ========================================================
+
+    terrainColor(
+        terrain
+    ) {
+
+        return (
+            this.colors[terrain] ??
+            this.colors.plain
+        );
+
+    }
+
+
+    // ========================================================
+    // 绘制基础地图
+    // ========================================================
 
     drawTerrain() {
 
@@ -197,20 +279,11 @@ export class Renderer {
                     );
 
 
-                /*
-                 * 简单视口裁剪。
-                 */
-
-                if (
-                    p.x < -size ||
-                    p.y < -size ||
-                    p.x > this.width + size ||
-                    p.y > this.height + size
-                ) {
-
-                    continue;
-
-                }
+                const terrain =
+                    this.world.terrainAt(
+                        q,
+                        r
+                    );
 
 
                 drawHexPath(
@@ -223,89 +296,233 @@ export class Renderer {
 
                 ctx.fillStyle =
                     this.terrainColor(
-                        this.world
-                            .terrainAt(
-                                q,
-                                r
-                            )
+                        terrain
                     );
 
 
                 ctx.fill();
 
 
-                /*
-                 * 六边格保持较淡。
-                 */
-
                 ctx.strokeStyle =
-                    "rgba(45,45,35,0.28)";
+                    this.colors.grid;
 
 
                 ctx.lineWidth =
                     Math.max(
-                        0.5,
-                        this.camera.zoom *
-                        0.7
+                        0.6,
+                        this.camera.zoom
                     );
 
 
                 ctx.stroke();
+
             }
+
         }
+
     }
 
 
-    // ========================================
-    // 通用地图折线
-    // ========================================
+    // ========================================================
+    // 获取地图要素
+    // ========================================================
 
-    drawFeatureLine(
-        points,
-        options
+    getFeatureArray(
+        ...names
     ) {
 
-        if (
-            !points ||
-            points.length < 2
+        for (
+            const name
+            of names
         ) {
 
-            return;
+            if (
+                Array.isArray(
+                    this.world[name]
+                )
+            ) {
+
+                return this.world[name];
+
+            }
 
         }
 
+
+        return [];
+
+    }
+
+
+    // ========================================================
+    // 将地图要素节点转换成 Hex
+    // ========================================================
+
+    featureHex(
+        point
+    ) {
+
+        if (!point) {
+            return null;
+        }
+
+
+        if (
+            Array.isArray(point)
+        ) {
+
+            return {
+
+                q: Number(point[0]),
+
+                r: Number(point[1])
+
+            };
+
+        }
+
+
+        if (
+            point.q !== undefined &&
+            point.r !== undefined
+        ) {
+
+            return {
+
+                q: Number(point.q),
+
+                r: Number(point.r)
+
+            };
+
+        }
+
+
+        return null;
+
+    }
+
+
+    // ========================================================
+    // 绘制线路
+    // ========================================================
+
+    drawFeatureLines(
+        features,
+        options = {}
+    ) {
 
         const ctx =
             this.ctx;
 
 
+        const color =
+            options.color ??
+            "#000000";
+
+
+        const width =
+            options.width ??
+            2;
+
+
+        const dashed =
+            options.dashed ??
+            false;
+
+
         ctx.save();
 
 
-        ctx.beginPath();
+        ctx.strokeStyle =
+            color;
 
 
-        points.forEach(
-            (
-                [q, r],
-                index
-            ) => {
+        ctx.lineWidth =
+            width *
+            this.camera.zoom;
 
-                const p =
-                    this.worldToScreen(
-                        q,
-                        r
+
+        ctx.lineCap =
+            "round";
+
+
+        ctx.lineJoin =
+            "round";
+
+
+        if (dashed) {
+
+            ctx.setLineDash([
+                5 * this.camera.zoom,
+                5 * this.camera.zoom
+            ]);
+
+        }
+
+
+        for (
+            const feature
+            of features
+        ) {
+
+            const points =
+                feature.points ??
+                feature.path ??
+                feature.hexes ??
+                feature;
+
+
+            if (
+                !Array.isArray(points) ||
+                points.length < 2
+            ) {
+
+                continue;
+
+            }
+
+
+            ctx.beginPath();
+
+
+            let started =
+                false;
+
+
+            for (
+                const rawPoint
+                of points
+            ) {
+
+                const hex =
+                    this.featureHex(
+                        rawPoint
                     );
 
 
-                if (
-                    index === 0
-                ) {
+                if (!hex) {
+                    continue;
+                }
+
+
+                const p =
+                    this.worldToScreen(
+                        hex.q,
+                        hex.r
+                    );
+
+
+                if (!started) {
 
                     ctx.moveTo(
                         p.x,
                         p.y
                     );
+
+
+                    started =
+                        true;
 
                 }
 
@@ -319,241 +536,164 @@ export class Renderer {
                 }
 
             }
-        );
 
 
-        ctx.strokeStyle =
-            options.strokeStyle;
+            if (started) {
 
+                ctx.stroke();
 
-        ctx.lineWidth =
-            options.lineWidth *
-            this.camera.zoom;
-
-
-        ctx.lineCap =
-            "round";
-
-
-        ctx.lineJoin =
-            "round";
-
-
-        if (
-            options.dash
-        ) {
-
-            ctx.setLineDash(
-
-                options.dash.map(
-                    value =>
-                        value *
-                        this.camera.zoom
-                )
-
-            );
+            }
 
         }
-
-
-        ctx.stroke();
 
 
         ctx.restore();
+
     }
 
 
-    // ========================================
+    // ========================================================
     // 河流
-    // ========================================
+    // ========================================================
 
     drawRivers() {
 
-        for (
-            const river
-            of this.world
-                .features
-                .rivers
-        ) {
-
-            /*
-             * 河岸
-             */
-
-            this.drawFeatureLine(
-
-                river.points,
-
-                {
-                    strokeStyle:
-                        "rgba(70,91,98,0.65)",
-
-                    lineWidth:
-                        river.width + 3
-                }
-
+        const rivers =
+            this.getFeatureArray(
+                "rivers",
+                "riverFeatures"
             );
 
 
-            /*
-             * 河水
-             */
+        this.drawFeatureLines(
+            rivers,
+            {
+                color:
+                    this.colors.river,
 
-            this.drawFeatureLine(
+                width:
+                    3.2
+            }
+        );
 
-                river.points,
-
-                {
-                    strokeStyle:
-                        "#7695a1",
-
-                    lineWidth:
-                        river.width
-                }
-
-            );
-
-        }
     }
 
 
-    // ========================================
-    // 公路
-    // ========================================
+    // ========================================================
+    // 道路
+    // ========================================================
 
     drawRoads() {
 
-        for (
-            const road
-            of this.world
-                .features
-                .roads
-        ) {
-
-            /*
-             * 道路外缘
-             */
-
-            this.drawFeatureLine(
-
-                road.points,
-
-                {
-                    strokeStyle:
-                        "#625b48",
-
-                    lineWidth: 5
-                }
-
+        const roads =
+            this.getFeatureArray(
+                "roads",
+                "roadFeatures"
             );
 
 
-            /*
-             * 道路主体
-             */
+        this.drawFeatureLines(
+            roads,
+            {
+                color:
+                    this.colors.road,
 
-            this.drawFeatureLine(
+                width:
+                    1.8
+            }
+        );
 
-                road.points,
-
-                {
-                    strokeStyle:
-                        "#c5b78d",
-
-                    lineWidth: 3
-                }
-
-            );
-
-        }
     }
 
 
-    // ========================================
+    // ========================================================
     // 铁路
-    // ========================================
+    // ========================================================
 
     drawRailways() {
 
-        for (
-            const railway
-            of this.world
-                .features
-                .railways
-        ) {
-
-            this.drawFeatureLine(
-
-                railway.points,
-
-                {
-                    strokeStyle:
-                        "#403d35",
-
-                    lineWidth: 2,
-
-                    dash: [
-                        8,
-                        5
-                    ]
-                }
-
+        const railways =
+            this.getFeatureArray(
+                "railways",
+                "rails",
+                "railwayFeatures"
             );
 
-        }
+
+        this.drawFeatureLines(
+            railways,
+            {
+                color:
+                    this.colors.railway,
+
+                width:
+                    1.2,
+
+                dashed:
+                    true
+            }
+        );
+
     }
 
 
-    // ========================================
+    // ========================================================
     // 城镇
-    // ========================================
+    // ========================================================
 
     drawSettlements() {
+
+        const settlements =
+            this.getFeatureArray(
+                "settlements",
+                "cities",
+                "towns"
+            );
+
 
         const ctx =
             this.ctx;
 
 
+        ctx.save();
+
+
         for (
             const settlement
-            of this.world
-                .features
-                .settlements
+            of settlements
         ) {
+
+            const q =
+                settlement.q;
+
+
+            const r =
+                settlement.r;
+
+
+            if (
+                q === undefined ||
+                r === undefined
+            ) {
+
+                continue;
+
+            }
+
 
             const p =
                 this.worldToScreen(
-                    settlement.q,
-                    settlement.r
+                    q,
+                    r
                 );
-
-
-            const city =
-                settlement.type ===
-                "city";
 
 
             const radius =
-                (
-                    city
-                        ? 6
-                        : 4
-                )
-                *
                 Math.max(
-                    0.8,
-                    Math.min(
-                        1.4,
-                        this.camera.zoom
-                    )
+                    3,
+                    4 *
+                    this.camera.zoom
                 );
-
-
-            ctx.save();
-
-
-            ctx.fillStyle =
-                "#37352d";
 
 
             ctx.beginPath();
@@ -568,25 +708,25 @@ export class Renderer {
             );
 
 
+            ctx.fillStyle =
+                "#34352e";
+
+
             ctx.fill();
 
 
-            /*
-             * 地名不要无限随地图放大。
-             */
-
-            const fontSize =
-                city
-                    ? 15
-                    : 13;
-
-
             ctx.font =
-                `${fontSize}px FangSong, serif`;
+                `${
+                    Math.max(
+                        10,
+                        13 *
+                        this.camera.zoom
+                    )
+                }px FangSong, STKaiti, serif`;
 
 
             ctx.fillStyle =
-                "#292820";
+                "#4c493f";
 
 
             ctx.textAlign =
@@ -598,34 +738,399 @@ export class Renderer {
 
 
             ctx.fillText(
-
-                `${settlement.nameZh}  ${settlement.name}`,
-
+                settlement.name ??
+                "",
                 p.x +
-                    radius +
-                    6,
-
-                p.y - 4
-
+                radius +
+                5,
+                p.y
             );
 
-
-            ctx.restore();
-
         }
+
+
+        ctx.restore();
+
     }
 
 
-    // ========================================
-    // 单位
-    // ========================================
+    // ========================================================
+    // 移动范围
+    // ========================================================
 
-    drawUnits(units) {
+    drawMovementRange() {
+
+        if (
+            !this.movementSystem ||
+            !this.movementSystem.selectedUnit
+        ) {
+
+            return;
+
+        }
+
+
+        const ctx =
+            this.ctx;
+
+
+        const size =
+            this.hexSize *
+            this.camera.zoom;
+
+
+        ctx.save();
+
+
+        for (
+            const [
+                key,
+                cost
+            ]
+            of this.movementSystem
+                .reachable
+                .entries()
+        ) {
+
+            const [
+                q,
+                r
+            ] =
+                key
+                    .split(",")
+                    .map(Number);
+
+
+            const p =
+                this.worldToScreen(
+                    q,
+                    r
+                );
+
+
+            drawHexPath(
+                ctx,
+                p.x,
+                p.y,
+                size * 0.92
+            );
+
+
+            ctx.fillStyle =
+                "rgba(96, 137, 91, 0.32)";
+
+
+            ctx.fill();
+
+
+            ctx.strokeStyle =
+                "rgba(65, 103, 65, 0.82)";
+
+
+            ctx.lineWidth =
+                Math.max(
+                    1,
+                    1.5 *
+                    this.camera.zoom
+                );
+
+
+            ctx.stroke();
+
+
+            // 放大后显示移动成本
+
+            if (
+                this.camera.zoom >= 1.15
+            ) {
+
+                ctx.fillStyle =
+                    "rgba(35, 55, 35, 0.75)";
+
+
+                ctx.font =
+                    `${
+                        Math.max(
+                            8,
+                            9 *
+                            this.camera.zoom
+                        )
+                    }px FangSong, serif`;
+
+
+                ctx.textAlign =
+                    "center";
+
+
+                ctx.textBaseline =
+                    "middle";
+
+
+                ctx.fillText(
+                    String(cost),
+                    p.x,
+                    p.y
+                );
+
+            }
+
+        }
+
+
+        ctx.restore();
+
+    }
+
+
+    // ========================================================
+    // 单位颜色
+    // ========================================================
+
+    factionColor(
+        faction
+    ) {
+
+        if (
+            faction === "GER" ||
+            faction === "germany" ||
+            faction === "German"
+        ) {
+
+            return "#8798a6";
+
+        }
+
+
+        if (
+            faction === "USSR" ||
+            faction === "soviet" ||
+            faction === "Soviet"
+        ) {
+
+            return "#c45f59";
+
+        }
+
+
+        return "#a9a68f";
+
+    }
+
+
+    // ========================================================
+    // 绘制军事符号
+    // ========================================================
+
+    drawMilitarySymbol(
+        unit,
+        x,
+        y,
+        width,
+        height
+    ) {
+
+        const ctx =
+            this.ctx;
+
+
+        const type =
+            unit.type ??
+            "infantry";
+
+
+        ctx.save();
+
+
+        ctx.strokeStyle =
+            "#171916";
+
+
+        ctx.fillStyle =
+            "#171916";
+
+
+        ctx.lineWidth =
+            Math.max(
+                1.5,
+                2 *
+                this.camera.zoom
+            );
+
+
+        if (
+            type === "infantry"
+        ) {
+
+            ctx.beginPath();
+
+            ctx.moveTo(
+                x - width * 0.32,
+                y - height * 0.27
+            );
+
+            ctx.lineTo(
+                x + width * 0.32,
+                y + height * 0.27
+            );
+
+            ctx.moveTo(
+                x + width * 0.32,
+                y - height * 0.27
+            );
+
+            ctx.lineTo(
+                x - width * 0.32,
+                y + height * 0.27
+            );
+
+            ctx.stroke();
+
+        }
+
+        else if (
+            type === "armor"
+        ) {
+
+            ctx.beginPath();
+
+            ctx.ellipse(
+                x,
+                y,
+                width * 0.27,
+                height * 0.18,
+                0,
+                0,
+                Math.PI * 2
+            );
+
+            ctx.stroke();
+
+        }
+
+        else if (
+            type === "artillery"
+        ) {
+
+            ctx.beginPath();
+
+            ctx.arc(
+                x,
+                y,
+                height * 0.13,
+                0,
+                Math.PI * 2
+            );
+
+            ctx.fill();
+
+        }
+
+        else if (
+            type === "antitank"
+        ) {
+
+            ctx.beginPath();
+
+            ctx.moveTo(
+                x - width * 0.28,
+                y
+            );
+
+            ctx.lineTo(
+                x + width * 0.28,
+                y
+            );
+
+            ctx.stroke();
+
+
+            ctx.beginPath();
+
+            ctx.arc(
+                x,
+                y,
+                height * 0.12,
+                0,
+                Math.PI * 2
+            );
+
+            ctx.stroke();
+
+        }
+
+        else if (
+            type === "reconnaissance"
+        ) {
+
+            ctx.beginPath();
+
+            ctx.moveTo(
+                x - width * 0.28,
+                y + height * 0.20
+            );
+
+            ctx.lineTo(
+                x,
+                y - height * 0.22
+            );
+
+            ctx.lineTo(
+                x + width * 0.28,
+                y + height * 0.20
+            );
+
+            ctx.stroke();
+
+        }
+
+        else {
+
+            ctx.beginPath();
+
+            ctx.arc(
+                x,
+                y,
+                height * 0.11,
+                0,
+                Math.PI * 2
+            );
+
+            ctx.fill();
+
+        }
+
+
+        ctx.restore();
+
+    }
+
+
+    // ========================================================
+    // 绘制单位
+    // ========================================================
+
+    drawUnits(
+        units = []
+    ) {
+
+        const ctx =
+            this.ctx;
+
 
         for (
             const unit
             of units
         ) {
+
+            if (
+                unit.q === undefined ||
+                unit.r === undefined
+            ) {
+
+                continue;
+
+            }
+
 
             const p =
                 this.worldToScreen(
@@ -634,21 +1139,130 @@ export class Renderer {
                 );
 
 
-            /*
-             * 单位军标不随着地图无限放大。
-             */
+            const width =
+                42 *
+                this.camera.zoom;
 
-            const symbolScale =
-                Math.max(
-                    0.75,
-                    Math.min(
-                        1.35,
+
+            const height =
+                30 *
+                this.camera.zoom;
+
+
+            const selected =
+                this.selection &&
+                this.selection.selectedUnit ===
+                unit;
+
+
+            // ------------------------------------------------
+            // 选中框
+            // ------------------------------------------------
+
+            if (selected) {
+
+                ctx.save();
+
+
+                ctx.strokeStyle =
+                    "#e8c85b";
+
+
+                ctx.lineWidth =
+                    Math.max(
+                        2,
+                        3 *
                         this.camera.zoom
-                    )
+                    );
+
+
+                ctx.strokeRect(
+
+                    p.x -
+                    width / 2 -
+                    5,
+
+                    p.y -
+                    height / 2 -
+                    5,
+
+                    width +
+                    10,
+
+                    height +
+                    10
+
                 );
 
 
-            this.symbolRenderer.draw(
+                ctx.restore();
+
+            }
+
+
+            // ------------------------------------------------
+            // 单位底色
+            // ------------------------------------------------
+
+            ctx.save();
+
+
+            ctx.fillStyle =
+                this.factionColor(
+                    unit.faction
+                );
+
+
+            ctx.strokeStyle =
+                "#1c1e1b";
+
+
+            ctx.lineWidth =
+                Math.max(
+                    1.5,
+                    2 *
+                    this.camera.zoom
+                );
+
+
+            ctx.fillRect(
+
+                p.x -
+                width / 2,
+
+                p.y -
+                height / 2,
+
+                width,
+
+                height
+
+            );
+
+
+            ctx.strokeRect(
+
+                p.x -
+                width / 2,
+
+                p.y -
+                height / 2,
+
+                width,
+
+                height
+
+            );
+
+
+            ctx.restore();
+
+
+            // ------------------------------------------------
+            // 军事符号
+            // ------------------------------------------------
+
+            this.drawMilitarySymbol(
 
                 unit,
 
@@ -656,56 +1270,149 @@ export class Renderer {
 
                 p.y,
 
-                symbolScale
+                width,
+
+                height
 
             );
 
+
+            // ------------------------------------------------
+            // 上级番号
+            // ------------------------------------------------
+
+            const regiment =
+                unit.regiment ??
+                unit.parent?.regiment ??
+                unit.parentUnit ??
+                "";
+
+
+            if (regiment) {
+
+                ctx.save();
+
+
+                ctx.fillStyle =
+                    "#4b493f";
+
+
+                ctx.font =
+                    `${
+                        Math.max(
+                            7,
+                            8 *
+                            this.camera.zoom
+                        )
+                    }px FangSong, serif`;
+
+
+                ctx.textAlign =
+                    "center";
+
+
+                ctx.fillText(
+
+                    String(regiment),
+
+                    p.x,
+
+                    p.y -
+                    height / 2 -
+                    4
+
+                );
+
+
+                ctx.restore();
+
+            }
+
+
+            // ------------------------------------------------
+            // 单位名称
+            // ------------------------------------------------
+
+            ctx.save();
+
+
+            ctx.fillStyle =
+                "#34352f";
+
+
+            ctx.font =
+                `${
+                    Math.max(
+                        8,
+                        10 *
+                        this.camera.zoom
+                    )
+                }px FangSong, serif`;
+
+
+            ctx.textAlign =
+                "center";
+
+
+            ctx.textBaseline =
+                "top";
+
+
+            ctx.fillText(
+
+                unit.name ??
+                "",
+
+                p.x,
+
+                p.y +
+                height / 2 +
+                4
+
+            );
+
+
+            ctx.restore();
+
         }
+
     }
 
 
-    // ========================================
-    // 主渲染
-    // ========================================
+    // ========================================================
+    // 总渲染
+    // ========================================================
 
-    render(units = []) {
+    render(
+        units = []
+    ) {
 
-        this.ctx.clearRect(
-            0,
-            0,
-            this.width,
-            this.height
-        );
+        this.clear();
 
 
-        /*
-         * 地图图层顺序
-         *
-         * 地形
-         * ↓
-         * 河流
-         * ↓
-         * 道路
-         * ↓
-         * 铁路
-         * ↓
-         * 城镇
-         * ↓
-         * 单位
-         */
-
+        // 地形
         this.drawTerrain();
 
-        this.drawRivers();
 
+        // 地理要素
         this.drawRoads();
 
         this.drawRailways();
 
+        this.drawRivers();
+
         this.drawSettlements();
 
+
+        // 移动范围必须位于单位下面
+        this.drawMovementRange();
+
+
+        // 单位
         this.drawUnits(
             units
         );
+
     }
+
 }
