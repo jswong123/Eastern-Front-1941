@@ -1,103 +1,43 @@
-export class WorldMap {
+export class MapFeatures {
 
     constructor() {
-
-        this.width = 42;
-        this.height = 30;
-
-
-        /*
-         * V0.1 是地图引擎测试地形。
-         *
-         * 后续这里会被真实的
-         * Dubno / Brody / Lutsk
-         * 地理数据替代。
-         */
-
-        this.specialTerrain = new Map();
-
-
-        this.createTestTerrain();
-
+        this.rivers = [];
+        this.roads = [];
+        this.railways = [];
+        this.settlements = [];
     }
 
-
-    key(q, r) {
-
-        return `${q},${r}`;
-
+    addRiver(name, points, options = {}) {
+        this.rivers.push({
+            name,
+            points,
+            width: options.width ?? 5
+        });
     }
 
-
-    createTestTerrain() {
-
-        /*
-         * 森林带
-         */
-
-        for (let q = 8; q < 18; q++) {
-
-            this.specialTerrain.set(
-                this.key(q, 8),
-                "forest"
-            );
-
-            this.specialTerrain.set(
-                this.key(q, 9),
-                "forest"
-            );
-
-        }
-
-
-        /*
-         * 河流测试区
-         */
-
-        for (let r = 5; r < 26; r++) {
-
-            this.specialTerrain.set(
-                this.key(24, r),
-                "river"
-            );
-
-        }
-
-
-        /*
-         * 城镇
-         */
-
-        this.specialTerrain.set(
-            this.key(20, 14),
-            "town"
-        );
-
-
-        this.specialTerrain.set(
-            this.key(30, 10),
-            "town"
-        );
-
-
-        this.specialTerrain.set(
-            this.key(12, 20),
-            "town"
-        );
-
+    addRoad(name, points, options = {}) {
+        this.roads.push({
+            name,
+            points,
+            importance: options.importance ?? "main"
+        });
     }
 
-
-    terrainAt(q, r) {
-
-        return (
-            this.specialTerrain.get(
-                this.key(q, r)
-            )
-            ??
-            "plain"
-        );
-
+    addRailway(name, points) {
+        this.railways.push({
+            name,
+            points
+        });
     }
 
+    addSettlement(data) {
+        this.settlements.push({
+            id: data.id,
+            name: data.name,
+            nameZh: data.nameZh,
+            q: data.q,
+            r: data.r,
+            type: data.type ?? "town"
+        });
+    }
 }
