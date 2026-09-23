@@ -1,35 +1,26 @@
 // ============================================================
 // main.js
+// 东线 1941 V0.5
 //
-// 东线 1941
-// V0.4B
-//
-// 游戏入口
+// 功能：
+// - 地图初始化
+// - Camera
+// - 单位加载
+// - 阵营选择
+// - 单位选择
+// - 移动系统
+// - 回合系统
+// - 行动点 AP
+// - 德军 / 苏军行动阶段
 // ============================================================
 
-import {
-    WorldMap
-} from "./WorldMap.js";
-
-import {
-    Camera
-} from "./Camera.js";
-
-import {
-    Renderer
-} from "./Renderer.js";
-
-import {
-    UnitSelection
-} from "./UnitSelection.js";
-
-import {
-    GameState
-} from "./GameState.js";
-
-import {
-    FactionSelection
-} from "./FactionSelection.js";
+import { WorldMap } from "./WorldMap.js";
+import { Camera } from "./Camera.js";
+import { Renderer } from "./Renderer.js";
+import { UnitSelection } from "./UnitSelection.js";
+import { GameState } from "./GameState.js";
+import { FactionSelection } from "./FactionSelection.js";
+import { TurnSystem } from "./TurnSystem.js";
 
 import {
     MovementSystem
@@ -41,36 +32,38 @@ import {
 
 
 // ============================================================
-// Canvas
+// DOM
 // ============================================================
 
 const canvas =
-    document.getElementById(
-        "game-canvas"
-    );
-
-const mapArea =
-    document.getElementById(
-        "mapArea"
-    );
-
+    document.getElementById("game-canvas");
 
 if (!canvas) {
-
     throw new Error(
-        "找不到 #game-canvas"
+        "找不到 #game-canvas，请检查 index.html"
     );
-
 }
 
+const mapArea =
+    document.getElementById("mapArea");
 
-if (!mapArea) {
+const unitInfo =
+    document.getElementById("unitInfo");
 
-    throw new Error(
-        "找不到 #mapArea"
-    );
+const turnInfo =
+    document.getElementById("turnInfo");
 
-}
+const turnNumber =
+    document.getElementById("turnNumber");
+
+const turnTime =
+    document.getElementById("turnTime");
+
+const turnPhase =
+    document.getElementById("turnPhase");
+
+const endPhaseButton =
+    document.getElementById("endPhaseButton");
 
 
 // ============================================================
@@ -79,89 +72,50 @@ if (!mapArea) {
 
 function resizeCanvas() {
 
-    const width =
-        mapArea.clientWidth;
+    const container =
+        mapArea ?? canvas.parentElement;
 
-    const height =
-        mapArea.clientHeight;
+    if (!container) {
+        return;
+    }
+
+    const rect =
+        container.getBoundingClientRect();
+
+    const dpr =
+        window.devicePixelRatio || 1;
 
 
-    if (
-        width <= 0 ||
-        height <= 0
-    ) {
-
-        console.warn(
-            "地图区域尺寸异常：",
-            width,
-            height
+    canvas.width =
+        Math.max(
+            1,
+            Math.floor(rect.width * dpr)
         );
 
-        return;
-
-    }
-
-
-    /*
-     * 游戏坐标统一采用 CSS 像素。
-     *
-     * 不使用 devicePixelRatio，
-     * 避免 Canvas 内部坐标与鼠标坐标不一致。
-     */
-
-    const targetWidth =
-        Math.round(width);
-
-    const targetHeight =
-        Math.round(height);
-
-
-    if (
-        canvas.width !== targetWidth ||
-        canvas.height !== targetHeight
-    ) {
-
-        canvas.width =
-            targetWidth;
-
-        canvas.height =
-            targetHeight;
-
-    }
+    canvas.height =
+        Math.max(
+            1,
+            Math.floor(rect.height * dpr)
+        );
 
 
     canvas.style.width =
-        `${targetWidth}px`;
+        `${rect.width}px`;
 
     canvas.style.height =
-        `${targetHeight}px`;
-
+        `${rect.height}px`;
 }
 
 
-// 第一次确定 Canvas 大小
-resizeCanvas();
-
-
 // ============================================================
-// 世界
+// 游戏核心对象
 // ============================================================
 
 const world =
     new WorldMap();
 
-
-// ============================================================
-// Camera
-// ============================================================
-
 const camera =
     new Camera();
-
-
-// ============================================================
-// Renderer
-// ============================================================
 
 const renderer =
     new Renderer(
@@ -170,59 +124,47 @@ const renderer =
         camera
     );
 
-
-// ============================================================
-// Game State
-// ============================================================
-
 const gameState =
     new GameState();
 
-
-// ============================================================
-// 单位选择
-// ============================================================
-
 const selection =
-    new UnitSelection(
-        renderer,
-        gameState
-    );
-
-
-// ============================================================
-// 移动系统
-// ============================================================
+    new UnitSelection();
 
 const movementSystem =
-    new MovementSystem(
-        world
-    );
+    new MovementSystem(world);
+
+const factionSelection =
+    new FactionSelection(gameState);
 
 
+// 让 Renderer 可以读取移动范围
 renderer.movementSystem =
     movementSystem;
 
 
 // ============================================================
-// 阵营选择
+// 数据
 // ============================================================
 
-const factionSelection =
-    new FactionSelection(
-        gameState
-    );
+let scenario = null;
+
+let units = [];
+
+let turnSystem = null;
 
 
 // ============================================================
-// 游戏数据
+// 当前交互状态
 // ============================================================
 
-let scenario =
-    null;
+let selectedUnit = null;
 
-let units =
-    [];
+let isDragging = false;
+
+let dragMoved = false;
+
+let lastMouseX = 0;
+let lastMouseY = 0;
 
 
 // ============================================================
@@ -231,148 +173,1367 @@ let units =
 
 function render() {
 
-    renderer.render(
-        units
-    );
-
+    renderer.render(units);
 }
 
 
 // ============================================================
-// Canvas 自适应
+// Canvas 初始化
 // ============================================================
 
-function handleCanvasResize() {
-
-    const oldWidth =
-        canvas.width;
-
-    const oldHeight =
-        canvas.height;
-
-
-    resizeCanvas();
-
-
-    if (
-        oldWidth !== canvas.width ||
-        oldHeight !== canvas.height
-    ) {
-
-        render();
-
-    }
-
-}
-
+resizeCanvas();
 
 window.addEventListener(
     "resize",
-    handleCanvasResize
+    () => {
+
+        resizeCanvas();
+
+        render();
+    }
 );
 
 
-/*
- * ResizeObserver 可以检测：
- *
- * 浏览器尺寸变化
- * Sidebar 尺寸变化
- * mapArea 尺寸变化
- */
+// ============================================================
+// 阵营标准化
+// ============================================================
 
-if (
-    typeof ResizeObserver !==
-    "undefined"
-) {
+function normalizeSide(side) {
 
-    const resizeObserver =
-        new ResizeObserver(
-            () => {
-
-                handleCanvasResize();
-
-            }
-        );
+    const value =
+        String(side ?? "")
+            .trim()
+            .toLowerCase();
 
 
-    resizeObserver.observe(
-        mapArea
-    );
+    if (
+        value === "german" ||
+        value === "germany" ||
+        value === "axis" ||
+        value === "德军"
+    ) {
+        return "german";
+    }
 
+
+    if (
+        value === "soviet" ||
+        value === "ussr" ||
+        value === "redarmy" ||
+        value === "苏军" ||
+        value === "红军"
+    ) {
+        return "soviet";
+    }
+
+
+    return value;
 }
 
 
 // ============================================================
-// 初始化单位状态
+// 单位阵营
+// ============================================================
+
+function getUnitSide(unit) {
+
+    return normalizeSide(
+        unit?.side ??
+        unit?.faction ??
+        unit?.camp
+    );
+}
+
+
+// ============================================================
+// 初始化单位
 // ============================================================
 
 function initializeUnits() {
 
-    for (
-        const unit
-        of units
-    ) {
+    for (const unit of units) {
 
-        movementSystem
-            .initializeUnit(
-                unit
-            );
-
-
-        // -----------------------------
-        // 战斗状态默认值
-        // -----------------------------
+        // ----------------------------------------------------
+        // MovementSystem 初始化
+        // ----------------------------------------------------
 
         if (
-            unit.morale ===
-            undefined
+            typeof movementSystem.initializeUnit ===
+            "function"
         ) {
-
-            unit.morale =
-                80;
-
+            movementSystem.initializeUnit(unit);
         }
 
 
-        if (
-            unit.suppression ===
-            undefined
-        ) {
+        // ----------------------------------------------------
+        // 默认状态
+        // ----------------------------------------------------
 
-            unit.suppression =
-                0;
-
+        if (unit.morale == null) {
+            unit.morale = 80;
         }
 
-
-        if (
-            unit.fatigue ===
-            undefined
-        ) {
-
-            unit.fatigue =
-                0;
-
+        if (unit.suppression == null) {
+            unit.suppression = 0;
         }
 
-
-        if (
-            unit.ammunition ===
-            undefined
-        ) {
-
-            unit.ammunition =
-                100;
-
+        if (unit.fatigue == null) {
+            unit.fatigue = 0;
         }
 
+        if (unit.ammunition == null) {
+            unit.ammunition = 100;
+        }
     }
-
 }
 
 
 // ============================================================
-// 加载 Scenario
+// 创建回合系统
+// ============================================================
+
+function initializeTurnSystem() {
+
+    turnSystem =
+        new TurnSystem({
+
+            units,
+
+            year: 1941,
+            month: 6,
+            day: 26,
+
+            hour: 8,
+            minute: 0,
+
+            hoursPerTurn: 2,
+
+            startingPhase: "german"
+        });
+
+
+    // --------------------------------------------------------
+    // 阶段变化
+    // --------------------------------------------------------
+
+    turnSystem.onPhaseChanged =
+        () => {
+
+            clearSelection();
+
+            updateTurnUI();
+
+            render();
+        };
+
+
+    // --------------------------------------------------------
+    // 回合变化
+    // --------------------------------------------------------
+
+    turnSystem.onTurnChanged =
+        () => {
+
+            updateTurnUI();
+
+            render();
+        };
+
+
+    // --------------------------------------------------------
+    // 时间变化
+    // --------------------------------------------------------
+
+    turnSystem.onTimeChanged =
+        () => {
+
+            updateTurnUI();
+        };
+
+
+    updateTurnUI();
+}
+
+
+// ============================================================
+// 更新回合 UI
+// ============================================================
+
+function updateTurnUI() {
+
+    if (!turnSystem) {
+        return;
+    }
+
+
+    // --------------------------------------------------------
+    // 顶栏
+    // --------------------------------------------------------
+
+    if (turnInfo) {
+
+        turnInfo.textContent =
+            turnSystem.getHeaderText();
+    }
+
+
+    // --------------------------------------------------------
+    // 右侧回合编号
+    // --------------------------------------------------------
+
+    if (turnNumber) {
+
+        turnNumber.textContent =
+            `第${turnSystem.getTurnNumber()}回合`;
+    }
+
+
+    // --------------------------------------------------------
+    // 时间范围
+    // --------------------------------------------------------
+
+    if (turnTime) {
+
+        turnTime.textContent =
+            turnSystem.getTurnTimeRange();
+    }
+
+
+    // --------------------------------------------------------
+    // 当前行动方
+    // --------------------------------------------------------
+
+    if (turnPhase) {
+
+        turnPhase.textContent =
+            turnSystem.getPhaseName();
+    }
+
+
+    // --------------------------------------------------------
+    // 按钮
+    // --------------------------------------------------------
+
+    if (endPhaseButton) {
+
+        if (
+            turnSystem.phase ===
+            "german"
+        ) {
+
+            endPhaseButton.textContent =
+                "结束德军行动";
+
+        } else {
+
+            endPhaseButton.textContent =
+                "结束苏军行动";
+        }
+    }
+}
+
+
+// ============================================================
+// 结束阶段按钮
+// ============================================================
+
+endPhaseButton?.addEventListener(
+    "click",
+    () => {
+
+        if (!turnSystem) {
+            return;
+        }
+
+
+        turnSystem.endPhase();
+    }
+);
+
+
+// ============================================================
+// 清除单位选择
+// ============================================================
+
+function clearSelection() {
+
+    selectedUnit = null;
+
+
+    if (
+        typeof selection.clear ===
+        "function"
+    ) {
+        selection.clear();
+    }
+
+
+    if (
+        typeof renderer.setSelectedUnit ===
+        "function"
+    ) {
+        renderer.setSelectedUnit(null);
+    }
+
+
+    if (
+        typeof renderer.clearReachable ===
+        "function"
+    ) {
+        renderer.clearReachable();
+    }
+
+
+    if (
+        movementSystem.reachable instanceof Map
+    ) {
+        movementSystem.reachable.clear();
+    }
+
+
+    if (unitInfo) {
+
+        unitInfo.innerHTML =
+            "点击地图上的单位查看详情";
+    }
+}
+
+
+// ============================================================
+// 当前玩家是否允许操作这个单位
+// ============================================================
+
+function playerCanControlUnit(unit) {
+
+    if (!unit) {
+        return false;
+    }
+
+
+    // --------------------------------------------------------
+    // 必须是当前回合行动阵营
+    // --------------------------------------------------------
+
+    if (
+        turnSystem &&
+        !turnSystem.isUnitActive(unit)
+    ) {
+        return false;
+    }
+
+
+    // --------------------------------------------------------
+    // 观察员模式
+    // 可以查看，但不能真正操作
+    // --------------------------------------------------------
+
+    if (
+        gameState.mode === "observer"
+    ) {
+        return false;
+    }
+
+
+    // --------------------------------------------------------
+    // 获取玩家阵营
+    // --------------------------------------------------------
+
+    const playerSide =
+        normalizeSide(
+            gameState.playerSide ??
+            gameState.side ??
+            gameState.faction
+        );
+
+
+    // 如果 GameState 没有记录阵营，
+    // 暂时允许当前阶段单位操作
+    if (!playerSide) {
+        return true;
+    }
+
+
+    return (
+        getUnitSide(unit) ===
+        playerSide
+    );
+}
+
+
+// ============================================================
+// 是否允许查看单位
+// ============================================================
+
+function playerCanViewUnit(unit) {
+
+    if (!unit) {
+        return false;
+    }
+
+
+    // 观察员可以查看全部
+    if (
+        gameState.mode === "observer"
+    ) {
+        return true;
+    }
+
+
+    // 当前阶段己方单位
+    if (
+        playerCanControlUnit(unit)
+    ) {
+        return true;
+    }
+
+
+    // 敌军目前仍允许查看基本情报
+    // 后面战争迷雾系统会替换这里
+    return true;
+}
+
+
+// ============================================================
+// 显示单位信息
+// ============================================================
+
+function showUnitInfo(unit) {
+
+    if (!unitInfo || !unit) {
+        return;
+    }
+
+
+    const side =
+        getUnitSide(unit);
+
+
+    const sideName =
+        side === "german"
+            ? "德军"
+            : side === "soviet"
+                ? "苏军"
+                : "未知";
+
+
+    const name =
+        unit.nameZh ??
+        unit.name ??
+        unit.id ??
+        "未命名单位";
+
+
+    const type =
+        unit.typeZh ??
+        unit.type ??
+        unit.unitType ??
+        "未知";
+
+
+    const ap =
+        unit.actionPoints ?? "—";
+
+    const maxAP =
+        unit.maxActionPoints ?? "—";
+
+
+    unitInfo.innerHTML = `
+        <div class="unit-title">
+            ${name}
+        </div>
+
+        <div class="unit-row">
+            <span>阵营</span>
+            <strong>${sideName}</strong>
+        </div>
+
+        <div class="unit-row">
+            <span>兵种</span>
+            <strong>${type}</strong>
+        </div>
+
+        <div class="unit-row">
+            <span>行动点</span>
+            <strong>${ap} / ${maxAP}</strong>
+        </div>
+
+        <div class="unit-row">
+            <span>士气</span>
+            <strong>${unit.morale ?? "—"}</strong>
+        </div>
+
+        <div class="unit-row">
+            <span>压制</span>
+            <strong>${unit.suppression ?? "—"}</strong>
+        </div>
+
+        <div class="unit-row">
+            <span>疲劳</span>
+            <strong>${unit.fatigue ?? "—"}</strong>
+        </div>
+
+        <div class="unit-row">
+            <span>弹药</span>
+            <strong>${unit.ammunition ?? "—"}</strong>
+        </div>
+
+        <div class="unit-row">
+            <span>位置</span>
+            <strong>
+                ${unit.q ?? "—"},
+                ${unit.r ?? "—"}
+            </strong>
+        </div>
+    `;
+}
+
+
+// ============================================================
+// 选择单位
+// ============================================================
+
+function selectUnit(unit) {
+
+    if (!unit) {
+        return;
+    }
+
+
+    selectedUnit = unit;
+
+
+    if (
+        typeof selection.select ===
+        "function"
+    ) {
+        selection.select(unit);
+    }
+
+
+    if (
+        typeof renderer.setSelectedUnit ===
+        "function"
+    ) {
+        renderer.setSelectedUnit(unit);
+    }
+
+
+    showUnitInfo(unit);
+
+
+    // --------------------------------------------------------
+    // 只有可操作单位才显示移动范围
+    // --------------------------------------------------------
+
+    if (
+        !playerCanControlUnit(unit)
+    ) {
+
+        if (
+            typeof renderer.clearReachable ===
+            "function"
+        ) {
+            renderer.clearReachable();
+        }
+
+        render();
+
+        return;
+    }
+
+
+    calculateReachable(unit);
+
+    render();
+}
+
+
+// ============================================================
+// 计算移动范围
+// ============================================================
+
+function calculateReachable(unit) {
+
+    if (!unit) {
+        return;
+    }
+
+
+    // 优先使用 MovementSystem 自己的接口
+    if (
+        typeof movementSystem.calculateReachable ===
+        "function"
+    ) {
+
+        movementSystem.calculateReachable(
+            unit
+        );
+
+        return;
+    }
+
+
+    if (
+        typeof movementSystem.computeReachable ===
+        "function"
+    ) {
+
+        movementSystem.computeReachable(
+            unit
+        );
+
+        return;
+    }
+
+
+    if (
+        typeof movementSystem.getReachableHexes ===
+        "function"
+    ) {
+
+        const result =
+            movementSystem.getReachableHexes(
+                unit
+            );
+
+
+        if (
+            result instanceof Map
+        ) {
+            movementSystem.reachable =
+                result;
+        }
+
+        return;
+    }
+}
+
+
+// ============================================================
+// 获取移动格信息
+// ============================================================
+
+function getReachableData(q, r) {
+
+    if (
+        !movementSystem.reachable
+    ) {
+        return null;
+    }
+
+
+    const key =
+        `${q},${r}`;
+
+
+    if (
+        movementSystem.reachable instanceof Map
+    ) {
+        return (
+            movementSystem.reachable.get(key) ??
+            null
+        );
+    }
+
+
+    return (
+        movementSystem.reachable[key] ??
+        null
+    );
+}
+
+
+// ============================================================
+// 获取移动成本
+// ============================================================
+
+function getMovementCost(data) {
+
+    if (data == null) {
+        return null;
+    }
+
+
+    if (
+        typeof data === "number"
+    ) {
+        return data;
+    }
+
+
+    if (
+        Number.isFinite(data.cost)
+    ) {
+        return data.cost;
+    }
+
+
+    if (
+        Number.isFinite(data.totalCost)
+    ) {
+        return data.totalCost;
+    }
+
+
+    if (
+        Number.isFinite(data.distance)
+    ) {
+        return data.distance;
+    }
+
+
+    return null;
+}
+
+
+// ============================================================
+// 判断格子是否有单位
+// ============================================================
+
+function unitAtHex(q, r) {
+
+    return units.find(
+        unit =>
+            unit.q === q &&
+            unit.r === r
+    ) ?? null;
+}
+
+
+// ============================================================
+// 执行移动
+// ============================================================
+
+function tryMoveSelectedUnit(q, r) {
+
+    if (!selectedUnit) {
+        return false;
+    }
+
+
+    if (
+        !playerCanControlUnit(
+            selectedUnit
+        )
+    ) {
+        return false;
+    }
+
+
+    // --------------------------------------------------------
+    // 不能移动到已有单位的位置
+    // --------------------------------------------------------
+
+    const occupyingUnit =
+        unitAtHex(q, r);
+
+
+    if (
+        occupyingUnit &&
+        occupyingUnit !== selectedUnit
+    ) {
+        return false;
+    }
+
+
+    // --------------------------------------------------------
+    // 是否在移动范围
+    // --------------------------------------------------------
+
+    const reachableData =
+        getReachableData(q, r);
+
+
+    if (!reachableData) {
+        return false;
+    }
+
+
+    const movementCost =
+        getMovementCost(
+            reachableData
+        );
+
+
+    if (
+        movementCost == null
+    ) {
+        return false;
+    }
+
+
+    // --------------------------------------------------------
+    // AP 检查
+    // --------------------------------------------------------
+
+    if (
+        turnSystem &&
+        !turnSystem.canSpendAP(
+            selectedUnit,
+            movementCost
+        )
+    ) {
+        return false;
+    }
+
+
+    // --------------------------------------------------------
+    // 执行移动
+    // --------------------------------------------------------
+
+    selectedUnit.q = q;
+    selectedUnit.r = r;
+
+
+    // --------------------------------------------------------
+    // 消耗 AP
+    // --------------------------------------------------------
+
+    if (turnSystem) {
+
+        turnSystem.registerMove(
+            selectedUnit,
+            movementCost
+        );
+    }
+
+
+    // --------------------------------------------------------
+    // 重新计算剩余移动范围
+    // --------------------------------------------------------
+
+    calculateReachable(
+        selectedUnit
+    );
+
+
+    showUnitInfo(
+        selectedUnit
+    );
+
+
+    render();
+
+    return true;
+}
+
+
+// ============================================================
+// 屏幕坐标 -> 世界坐标
+// ============================================================
+
+function screenToWorld(
+    screenX,
+    screenY
+) {
+
+    const zoom =
+        camera.zoom ?? 1;
+
+
+    const offsetX =
+        camera.x ??
+        camera.offsetX ??
+        0;
+
+    const offsetY =
+        camera.y ??
+        camera.offsetY ??
+        0;
+
+
+    return {
+        x:
+            (screenX - offsetX) /
+            zoom,
+
+        y:
+            (screenY - offsetY) /
+            zoom
+    };
+}
+
+
+// ============================================================
+// 鼠标位置 -> Hex
+// ============================================================
+
+function mouseToHex(event) {
+
+    const rect =
+        canvas.getBoundingClientRect();
+
+
+    const mouseX =
+        event.clientX -
+        rect.left;
+
+    const mouseY =
+        event.clientY -
+        rect.top;
+
+
+    const worldPos =
+        screenToWorld(
+            mouseX,
+            mouseY
+        );
+
+
+    // Renderer 当前使用的六角格尺寸
+    const hexSize =
+        renderer.hexSize ??
+        renderer.size ??
+        18;
+
+
+    return pixelToHex(
+        worldPos.x,
+        worldPos.y,
+        hexSize
+    );
+}
+
+
+// ============================================================
+// 单位点击检测
+// ============================================================
+
+function findUnitAtMouse(event) {
+
+    const rect =
+        canvas.getBoundingClientRect();
+
+
+    const x =
+        event.clientX -
+        rect.left;
+
+    const y =
+        event.clientY -
+        rect.top;
+
+
+    if (
+        typeof selection.findUnitAt ===
+        "function"
+    ) {
+
+        return selection.findUnitAt(
+            x,
+            y,
+            units,
+            camera,
+            renderer
+        );
+    }
+
+
+    // --------------------------------------------------------
+    // 如果 UnitSelection 接口不同，
+    // 使用 Hex 位置作为备用检测
+    // --------------------------------------------------------
+
+    const hex =
+        mouseToHex(event);
+
+
+    if (!hex) {
+        return null;
+    }
+
+
+    return unitAtHex(
+        hex.q,
+        hex.r
+    );
+}
+
+
+// ============================================================
+// 鼠标按下
+// ============================================================
+
+canvas.addEventListener(
+    "mousedown",
+    event => {
+
+        if (event.button !== 0) {
+            return;
+        }
+
+
+        isDragging = true;
+
+        dragMoved = false;
+
+        lastMouseX =
+            event.clientX;
+
+        lastMouseY =
+            event.clientY;
+    }
+);
+
+
+// ============================================================
+// 鼠标拖动地图
+// ============================================================
+
+window.addEventListener(
+    "mousemove",
+    event => {
+
+        if (!isDragging) {
+            return;
+        }
+
+
+        const dx =
+            event.clientX -
+            lastMouseX;
+
+        const dy =
+            event.clientY -
+            lastMouseY;
+
+
+        if (
+            Math.abs(dx) > 1 ||
+            Math.abs(dy) > 1
+        ) {
+            dragMoved = true;
+        }
+
+
+        if (
+            typeof camera.pan ===
+            "function"
+        ) {
+
+            camera.pan(dx, dy);
+
+        } else {
+
+            if (
+                Number.isFinite(
+                    camera.x
+                )
+            ) {
+                camera.x += dx;
+            }
+
+            if (
+                Number.isFinite(
+                    camera.y
+                )
+            ) {
+                camera.y += dy;
+            }
+
+            if (
+                Number.isFinite(
+                    camera.offsetX
+                )
+            ) {
+                camera.offsetX += dx;
+            }
+
+            if (
+                Number.isFinite(
+                    camera.offsetY
+                )
+            ) {
+                camera.offsetY += dy;
+            }
+        }
+
+
+        lastMouseX =
+            event.clientX;
+
+        lastMouseY =
+            event.clientY;
+
+
+        render();
+    }
+);
+
+
+// ============================================================
+// 鼠标释放
+// ============================================================
+
+window.addEventListener(
+    "mouseup",
+    () => {
+
+        isDragging = false;
+    }
+);
+
+
+// ============================================================
+// 点击地图
+// ============================================================
+
+canvas.addEventListener(
+    "click",
+    event => {
+
+        // 拖动地图后不触发点击
+        if (dragMoved) {
+
+            dragMoved = false;
+
+            return;
+        }
+
+
+        // ----------------------------------------------------
+        // 先检查有没有点击单位
+        // ----------------------------------------------------
+
+        const clickedUnit =
+            findUnitAtMouse(event);
+
+
+        if (clickedUnit) {
+
+            if (
+                playerCanViewUnit(
+                    clickedUnit
+                )
+            ) {
+
+                selectUnit(
+                    clickedUnit
+                );
+            }
+
+            return;
+        }
+
+
+        // ----------------------------------------------------
+        // 没点单位：
+        // 如果已有己方单位被选择，尝试移动
+        // ----------------------------------------------------
+
+        if (selectedUnit) {
+
+            const hex =
+                mouseToHex(event);
+
+
+            if (
+                hex &&
+                tryMoveSelectedUnit(
+                    hex.q,
+                    hex.r
+                )
+            ) {
+                return;
+            }
+        }
+
+
+        // ----------------------------------------------------
+        // 点击空白区域
+        // ----------------------------------------------------
+
+        clearSelection();
+
+        render();
+    }
+);
+
+
+// ============================================================
+// 滚轮缩放
+// ============================================================
+
+canvas.addEventListener(
+    "wheel",
+    event => {
+
+        event.preventDefault();
+
+
+        const rect =
+            canvas.getBoundingClientRect();
+
+
+        const mouseX =
+            event.clientX -
+            rect.left;
+
+        const mouseY =
+            event.clientY -
+            rect.top;
+
+
+        const oldZoom =
+            camera.zoom ?? 1;
+
+
+        const zoomFactor =
+            event.deltaY < 0
+                ? 1.1
+                : 0.9;
+
+
+        let newZoom =
+            oldZoom * zoomFactor;
+
+
+        const minZoom =
+            camera.minZoom ?? 0.35;
+
+        const maxZoom =
+            camera.maxZoom ?? 3;
+
+
+        newZoom =
+            Math.max(
+                minZoom,
+                Math.min(
+                    maxZoom,
+                    newZoom
+                )
+            );
+
+
+        // ----------------------------------------------------
+        // 如果 Camera 自带 zoomAt，优先使用
+        // ----------------------------------------------------
+
+        if (
+            typeof camera.zoomAt ===
+            "function"
+        ) {
+
+            camera.zoomAt(
+                mouseX,
+                mouseY,
+                newZoom
+            );
+
+            render();
+
+            return;
+        }
+
+
+        // ----------------------------------------------------
+        // 手动实现鼠标中心缩放
+        // ----------------------------------------------------
+
+        const oldX =
+            camera.x ??
+            camera.offsetX ??
+            0;
+
+        const oldY =
+            camera.y ??
+            camera.offsetY ??
+            0;
+
+
+        const worldX =
+            (mouseX - oldX) /
+            oldZoom;
+
+        const worldY =
+            (mouseY - oldY) /
+            oldZoom;
+
+
+        const newX =
+            mouseX -
+            worldX * newZoom;
+
+        const newY =
+            mouseY -
+            worldY * newZoom;
+
+
+        camera.zoom =
+            newZoom;
+
+
+        if (
+            "x" in camera
+        ) {
+            camera.x = newX;
+        }
+
+        if (
+            "y" in camera
+        ) {
+            camera.y = newY;
+        }
+
+        if (
+            "offsetX" in camera
+        ) {
+            camera.offsetX =
+                newX;
+        }
+
+        if (
+            "offsetY" in camera
+        ) {
+            camera.offsetY =
+                newY;
+        }
+
+
+        render();
+
+    },
+    {
+        passive: false
+    }
+);
+
+
+// ============================================================
+// 键盘操作
+// ============================================================
+
+window.addEventListener(
+    "keydown",
+    event => {
+
+        // ESC：取消选择
+        if (
+            event.key === "Escape"
+        ) {
+
+            clearSelection();
+
+            render();
+        }
+
+
+        // E：结束当前阶段
+        if (
+            event.key.toLowerCase() ===
+            "e"
+        ) {
+
+            if (turnSystem) {
+                turnSystem.endPhase();
+            }
+        }
+    }
+);
+
+
+// ============================================================
+// 场景数据加载
 // ============================================================
 
 async function loadScenario() {
@@ -390,7 +1551,6 @@ async function loadScenario() {
             throw new Error(
                 `scenario.json 加载失败：${response.status}`
             );
-
         }
 
 
@@ -398,15 +1558,9 @@ async function loadScenario() {
             await response.json();
 
 
-        /*
-         * 兼容两种数据结构：
-         *
-         * scenario.units
-         *
-         * 或
-         *
-         * scenario.forces
-         */
+        // ----------------------------------------------------
+        // 兼容不同 scenario.json 结构
+        // ----------------------------------------------------
 
         if (
             Array.isArray(
@@ -417,611 +1571,108 @@ async function loadScenario() {
             units =
                 scenario.units;
 
-        }
-
-        else if (
+        } else if (
             Array.isArray(
-                scenario.forces
+                scenario
             )
         ) {
 
             units =
-                scenario.forces;
+                scenario;
 
-        }
+        } else {
 
-        else {
-
-            units =
+            const germanUnits =
+                scenario.german?.units ??
+                scenario.axis?.units ??
                 [];
 
+            const sovietUnits =
+                scenario.soviet?.units ??
+                scenario.ussr?.units ??
+                [];
+
+
+            units = [
+                ...germanUnits,
+                ...sovietUnits
+            ];
         }
 
+
+        // ----------------------------------------------------
+        // 初始化
+        // ----------------------------------------------------
 
         initializeUnits();
 
-
-        console.log(
-            "Scenario loaded:",
-            scenario
-        );
+        initializeTurnSystem();
 
 
-        console.log(
-            "Units:",
-            units
-        );
-
-
-        /*
-         * scenario 加载完成后再次确认尺寸。
-         */
-
-        resizeCanvas();
-
-        render();
-
-
-        /*
-         * 地图完成后显示阵营选择。
-         */
+        // ----------------------------------------------------
+        // 阵营选择界面
+        // ----------------------------------------------------
 
         if (
-            typeof factionSelection
-                .show ===
+            typeof factionSelection.show ===
             "function"
         ) {
 
             factionSelection.show();
 
+        } else if (
+            typeof factionSelection.open ===
+            "function"
+        ) {
+
+            factionSelection.open();
+
+        } else if (
+            typeof factionSelection.initialize ===
+            "function"
+        ) {
+
+            factionSelection.initialize();
         }
 
-    }
 
-    catch (error) {
+        render();
+
+
+        console.log(
+            "东线 1941 V0.5 已启动"
+        );
+
+        console.log(
+            "单位数量：",
+            units.length
+        );
+
+        console.log(
+            "回合状态：",
+            turnSystem.getState()
+        );
+
+    } catch (error) {
 
         console.error(
+            "游戏初始化失败：",
             error
         );
 
 
-        const panel =
-            document.getElementById(
-                "info-panel"
-            );
+        if (unitInfo) {
 
-
-        if (panel) {
-
-            panel.innerHTML = `
-
-                <h2>
-                    数据加载失败
-                </h2>
-
-                <p>
-                    无法加载 scenario.json
-                </p>
-
-                <p>
-                    请打开浏览器控制台查看错误。
-                </p>
-
+            unitInfo.innerHTML = `
+                <strong>
+                    游戏数据加载失败
+                </strong>
+                <br><br>
+                ${error.message}
             `;
-
         }
-
     }
-
 }
-
-
-// ============================================================
-// Camera 拖动
-// ============================================================
-
-let dragging =
-    false;
-
-let lastMouseX =
-    0;
-
-let lastMouseY =
-    0;
-
-let dragDistance =
-    0;
-
-
-// ------------------------------------------------------------
-// 鼠标按下
-// ------------------------------------------------------------
-
-canvas.addEventListener(
-    "mousedown",
-    event => {
-
-        dragging =
-            true;
-
-
-        lastMouseX =
-            event.clientX;
-
-        lastMouseY =
-            event.clientY;
-
-
-        dragDistance =
-            0;
-
-    }
-);
-
-
-// ------------------------------------------------------------
-// 鼠标移动
-// ------------------------------------------------------------
-
-window.addEventListener(
-    "mousemove",
-    event => {
-
-        if (!dragging) {
-            return;
-        }
-
-
-        const dx =
-            event.clientX -
-            lastMouseX;
-
-        const dy =
-            event.clientY -
-            lastMouseY;
-
-
-        dragDistance +=
-            Math.sqrt(
-                dx * dx +
-                dy * dy
-            );
-
-
-        camera.x +=
-            dx;
-
-        camera.y +=
-            dy;
-
-
-        lastMouseX =
-            event.clientX;
-
-        lastMouseY =
-            event.clientY;
-
-
-        render();
-
-    }
-);
-
-
-// ------------------------------------------------------------
-// 鼠标释放
-// ------------------------------------------------------------
-
-window.addEventListener(
-    "mouseup",
-    () => {
-
-        dragging =
-            false;
-
-    }
-);
-
-
-// ============================================================
-// 缩放
-// ============================================================
-
-canvas.addEventListener(
-    "wheel",
-    event => {
-
-        event.preventDefault();
-
-
-        const rect =
-            canvas
-                .getBoundingClientRect();
-
-
-        const mouseX =
-            event.clientX -
-            rect.left;
-
-        const mouseY =
-            event.clientY -
-            rect.top;
-
-
-        const oldZoom =
-            camera.zoom;
-
-
-        const zoomFactor =
-            event.deltaY < 0
-                ? 1.12
-                : 0.89;
-
-
-        let newZoom =
-            oldZoom *
-            zoomFactor;
-
-
-        newZoom =
-            Math.max(
-                0.45,
-                Math.min(
-                    2.5,
-                    newZoom
-                )
-            );
-
-
-        /*
-         * 鼠标指向的地图位置
-         * 在缩放前后保持不动。
-         */
-
-        const worldX =
-            (
-                mouseX -
-                camera.x
-            )
-            /
-            oldZoom;
-
-
-        const worldY =
-            (
-                mouseY -
-                camera.y
-            )
-            /
-            oldZoom;
-
-
-        camera.zoom =
-            newZoom;
-
-
-        camera.x =
-            mouseX -
-            worldX *
-            newZoom;
-
-
-        camera.y =
-            mouseY -
-            worldY *
-            newZoom;
-
-
-        render();
-
-    },
-    {
-        passive:
-            false
-    }
-);
-
-
-// ============================================================
-// 点击
-// ============================================================
-
-canvas.addEventListener(
-    "click",
-    event => {
-
-        /*
-         * 尚未选择阵营时，
-         * 不允许地图操作。
-         */
-
-        if (
-            gameState.mode ===
-            null
-        ) {
-
-            return;
-
-        }
-
-
-        /*
-         * 刚刚拖动过地图时，
-         * 不解释为点击。
-         */
-
-        if (
-            dragDistance >
-            8
-        ) {
-
-            dragDistance =
-                0;
-
-            return;
-
-        }
-
-
-        const rect =
-            canvas
-                .getBoundingClientRect();
-
-
-        const mouseX =
-            event.clientX -
-            rect.left;
-
-        const mouseY =
-            event.clientY -
-            rect.top;
-
-
-        // ====================================================
-        // 第一优先级：点击单位
-        // ====================================================
-
-        const clickedUnit =
-            selection.findUnitAt(
-
-                mouseX,
-
-                mouseY,
-
-                units
-
-            );
-
-
-        if (
-            clickedUnit
-        ) {
-
-            selection.select(
-                clickedUnit
-            );
-
-
-            /*
-             * 判断观察员模式。
-             */
-
-            const observer =
-                typeof gameState
-                    .isObserver ===
-                "function"
-                &&
-                gameState
-                    .isObserver();
-
-
-            /*
-             * 判断是否属于玩家。
-             */
-
-            const friendly =
-                typeof gameState
-                    .isPlayerUnit ===
-                "function"
-                ?
-                gameState
-                    .isPlayerUnit(
-                        clickedUnit
-                    )
-                :
-                true;
-
-
-            /*
-             * 只有玩家自己的单位
-             * 才进入移动模式。
-             */
-
-            if (
-                !observer &&
-                friendly
-            ) {
-
-                movementSystem
-                    .selectUnit(
-
-                        clickedUnit,
-
-                        units
-
-                    );
-
-            }
-
-            else {
-
-                movementSystem
-                    .clear();
-
-            }
-
-
-            render();
-
-            return;
-
-        }
-
-
-        // ====================================================
-        // 第二优先级：点击地图 Hex
-        // ====================================================
-
-        if (
-            movementSystem
-                .selectedUnit
-        ) {
-
-            /*
-             * Screen
-             * ↓
-             * World
-             */
-
-            const worldX =
-                (
-                    mouseX -
-                    camera.x
-                )
-                /
-                camera.zoom;
-
-
-            const worldY =
-                (
-                    mouseY -
-                    camera.y
-                )
-                /
-                camera.zoom;
-
-
-            /*
-             * World
-             * ↓
-             * Hex
-             */
-
-            const hex =
-                pixelToHex(
-
-                    worldX,
-
-                    worldY,
-
-                    renderer.hexSize
-
-                );
-
-
-            if (
-                movementSystem
-                    .canMoveTo(
-                        hex.q,
-                        hex.r
-                    )
-            ) {
-
-                const result =
-                    movementSystem
-                        .moveTo(
-                            hex.q,
-                            hex.r
-                        );
-
-
-                if (result) {
-
-                    console.log(
-                        "单位移动：",
-                        result
-                    );
-
-
-                    /*
-                     * 移动后刷新右侧资料。
-                     */
-
-                    selection.select(
-                        result.unit
-                    );
-
-                }
-
-
-                render();
-
-                return;
-
-            }
-
-        }
-
-
-        // ====================================================
-        // 点击普通空地
-        // ====================================================
-
-        movementSystem.clear();
-
-
-        selection.select(
-            null
-        );
-
-
-        render();
-
-    }
-);
-
-
-// ============================================================
-// 右键取消移动
-// ============================================================
-
-canvas.addEventListener(
-    "contextmenu",
-    event => {
-
-        event.preventDefault();
-
-
-        movementSystem.clear();
-
-
-        render();
-
-    }
-);
-
-
-// ============================================================
-// ESC 取消移动
-// ============================================================
-
-window.addEventListener(
-    "keydown",
-    event => {
-
-        if (
-            event.key ===
-            "Escape"
-        ) {
-
-            movementSystem.clear();
-
-            render();
-
-        }
-
-    }
-);
 
 
 // ============================================================
