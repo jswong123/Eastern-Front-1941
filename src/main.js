@@ -128,7 +128,10 @@ const gameState =
     new GameState();
 
 const selection =
-    new UnitSelection();
+    new UnitSelection(
+        renderer,
+        gameState
+    );
 
 const movementSystem =
     new MovementSystem(world);
