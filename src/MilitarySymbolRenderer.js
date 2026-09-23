@@ -1,102 +1,248 @@
-export class WorldMap {
+export class MilitarySymbolRenderer {
 
-    constructor() {
+    constructor(ctx) {
 
-        this.width = 42;
-        this.height = 30;
-
-
-        /*
-         * V0.1 是地图引擎测试地形。
-         *
-         * 后续这里会被真实的
-         * Dubno / Brody / Lutsk
-         * 地理数据替代。
-         */
-
-        this.specialTerrain = new Map();
-
-
-        this.createTestTerrain();
+        this.ctx = ctx;
 
     }
 
 
-    key(q, r) {
+    draw(unit, x, y, scale = 1) {
 
-        return `${q},${r}`;
+        const ctx = this.ctx;
 
-    }
+        const width = 52 * scale;
+        const height = 38 * scale;
 
 
-    createTestTerrain() {
+        ctx.save();
+
 
         /*
-         * 森林带
+         * 阵营底色
          */
 
-        for (let q = 8; q < 18; q++) {
+        if (unit.side === "germany") {
 
-            this.specialTerrain.set(
-                this.key(q, 8),
-                "forest"
+            ctx.fillStyle = "#76899a";
+
+        } else {
+
+            ctx.fillStyle = "#a85b55";
+
+        }
+
+
+        ctx.strokeStyle = "#1c1c18";
+        ctx.lineWidth = 2 * scale;
+
+
+        ctx.fillRect(
+            x - width / 2,
+            y - height / 2,
+            width,
+            height
+        );
+
+
+        ctx.strokeRect(
+            x - width / 2,
+            y - height / 2,
+            width,
+            height
+        );
+
+
+        /*
+         * 兵种符号
+         */
+
+        ctx.strokeStyle = "#111";
+        ctx.fillStyle = "#111";
+
+        ctx.lineWidth =
+            2 * scale;
+
+
+        if (unit.type === "infantry") {
+
+            this.drawInfantry(
+                x,
+                y,
+                width,
+                height
             );
 
-            this.specialTerrain.set(
-                this.key(q, 9),
-                "forest"
+        }
+
+
+        if (unit.type === "armor") {
+
+            this.drawArmor(
+                x,
+                y,
+                width,
+                height
+            );
+
+        }
+
+
+        if (unit.type === "artillery") {
+
+            this.drawArtillery(
+                x,
+                y
             );
 
         }
 
 
         /*
-         * 河流测试区
+         * 团级隶属标号
          */
 
-        for (let r = 5; r < 26; r++) {
+        ctx.font =
+            `${10 * scale}px FangSong, serif`;
 
-            this.specialTerrain.set(
-                this.key(24, r),
-                "river"
-            );
+        ctx.textAlign = "center";
 
-        }
+        ctx.fillStyle = "#f2eddc";
+
+
+        ctx.fillText(
+            unit.regiment,
+            x - width / 2 + 13 * scale,
+            y - height / 2 - 5 * scale
+        );
 
 
         /*
-         * 城镇
+         * 单位等级
          */
 
-        this.specialTerrain.set(
-            this.key(20, 14),
-            "town"
+        ctx.fillStyle = "#111";
+
+        ctx.font =
+            `${11 * scale}px serif`;
+
+
+        ctx.fillText(
+            unit.level === "company"
+                ? "Ⅰ"
+                : "•••",
+
+            x,
+            y - height / 2 - 5 * scale
         );
 
 
-        this.specialTerrain.set(
-            this.key(30, 10),
-            "town"
+        /*
+         * 单位名称
+         */
+
+        ctx.font =
+            `${10 * scale}px FangSong, serif`;
+
+        ctx.fillText(
+            unit.shortName,
+            x,
+            y + height / 2 + 13 * scale
         );
 
 
-        this.specialTerrain.set(
-            this.key(12, 20),
-            "town"
-        );
+        ctx.restore();
 
     }
 
 
-    terrainAt(q, r) {
+    drawInfantry(
+        x,
+        y,
+        width,
+        height
+    ) {
 
-        return (
-            this.specialTerrain.get(
-                this.key(q, r)
-            )
-            ??
-            "plain"
+        const ctx =
+            this.ctx;
+
+
+        ctx.beginPath();
+
+        ctx.moveTo(
+            x - width * 0.32,
+            y - height * 0.30
         );
+
+        ctx.lineTo(
+            x + width * 0.32,
+            y + height * 0.30
+        );
+
+
+        ctx.moveTo(
+            x + width * 0.32,
+            y - height * 0.30
+        );
+
+        ctx.lineTo(
+            x - width * 0.32,
+            y + height * 0.30
+        );
+
+        ctx.stroke();
+
+    }
+
+
+    drawArmor(
+        x,
+        y,
+        width,
+        height
+    ) {
+
+        const ctx =
+            this.ctx;
+
+
+        ctx.beginPath();
+
+        ctx.ellipse(
+            x,
+            y,
+            width * 0.30,
+            height * 0.22,
+            0,
+            0,
+            Math.PI * 2
+        );
+
+        ctx.stroke();
+
+    }
+
+
+    drawArtillery(
+        x,
+        y
+    ) {
+
+        const ctx =
+            this.ctx;
+
+
+        ctx.beginPath();
+
+        ctx.arc(
+            x,
+            y,
+            5,
+            0,
+            Math.PI * 2
+        );
+
+        ctx.fill();
 
     }
 
