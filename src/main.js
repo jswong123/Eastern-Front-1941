@@ -2399,7 +2399,7 @@ initializeGame()
         error => {
 
             console.error(
-                "游戏初始化失败：",
+                "系统初始化失败：",
                 error
             );
 
