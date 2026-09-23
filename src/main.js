@@ -1489,31 +1489,28 @@ function selectUnit(unit) {
     // 移动范围
     // --------------------------------------------------------
 
-    if (
-        playerCanControlUnit(
-            unit
-        )
-    ) {
+   if (
+    playerCanControlUnit(
+        unit
+    )
+) {
 
-console.log("准备计算移动范围：", unit);
+    console.log("准备计算移动范围：", unit);
 
-calculateReachable(
-    unit
-);
+    calculateReachable(
+        unit
+    );
 
-console.log("移动范围计算完成");
-console.log("reachable =", reachable);
-    else {
-        clearReachable();
+    console.log("移动范围计算完成");
 
-    }
+}
+else {
 
-
-    render();
+    clearReachable();
 
 }
 
-
+render();
 // ============================================================
 // Hex 上查找单位
 // ============================================================
