@@ -1,1 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+    <title>东线 1941：杜布诺</title>
+
+    <link rel="stylesheet" href="./style.css">
+</head>
+
+<body>
+
+<div id="game">
+
+    <header id="topbar">
+        <div>
+            <strong>东线 1941</strong>
+            <span class="subtitle">杜布诺战役 · V0.1</span>
+        </div>
+
+        <div id="turnInfo">
+            1941年6月26日 · 08:00
+        </div>
+    </header>
+
+
+    <main id="main">
+
+        <section id="mapArea">
+            <canvas id="gameCanvas"></canvas>
+        </section>
+
+
+        <aside id="sidebar">
+
+            <h2>作战信息</h2>
+
+            <div id="unitInfo">
+                点击地图上的单位查看详情
+            </div>
+
+            <hr>
+
+            <h3>地图操作</h3>
+
+            <p>鼠标拖动：移动地图</p>
+            <p>滚轮：缩放</p>
+            <p>点击单位：选择</p>
+
+            <hr>
+
+            <h3>图例</h3>
+
+            <p>德军：蓝灰色</p>
+            <p>苏军：红色</p>
+
+        </aside>
+
+    </main>
+
+</div>
+
+<script type="module" src="./src/main.js"></script>
+
+</body>
+</html>
