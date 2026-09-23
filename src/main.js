@@ -2,7 +2,7 @@
 // main.js
 //
 // 东线 1941
-// V0.4A
+// V0.4B
 //
 // 游戏入口
 // ============================================================
@@ -11,36 +11,29 @@ import {
     WorldMap
 } from "./WorldMap.js";
 
-
 import {
     Camera
 } from "./Camera.js";
-
 
 import {
     Renderer
 } from "./Renderer.js";
 
-
 import {
     UnitSelection
 } from "./UnitSelection.js";
-
 
 import {
     GameState
 } from "./GameState.js";
 
-
 import {
     FactionSelection
 } from "./FactionSelection.js";
 
-
 import {
     MovementSystem
 } from "./systems/MovementSystem.js";
-
 
 import {
     pixelToHex
@@ -56,11 +49,25 @@ const canvas =
         "game-canvas"
     );
 
+const mapArea =
+    document.getElementById(
+        "mapArea"
+    );
+
 
 if (!canvas) {
 
     throw new Error(
         "找不到 #game-canvas"
+    );
+
+}
+
+
+if (!mapArea) {
+
+    throw new Error(
+        "找不到 #mapArea"
     );
 
 }
@@ -72,61 +79,68 @@ if (!canvas) {
 
 function resizeCanvas() {
 
-    const rect =
-        canvas.getBoundingClientRect();
+    const width =
+        mapArea.clientWidth;
+
+    const height =
+        mapArea.clientHeight;
 
 
-    const dpr =
-        window.devicePixelRatio ||
-        1;
+    if (
+        width <= 0 ||
+        height <= 0
+    ) {
 
-
-    canvas.width =
-        Math.floor(
-            rect.width *
-            dpr
+        console.warn(
+            "地图区域尺寸异常：",
+            width,
+            height
         );
 
+        return;
 
-    canvas.height =
-        Math.floor(
-            rect.height *
-            dpr
-        );
+    }
 
 
     /*
-     * CSS 像素与 Canvas 像素保持一致。
+     * 游戏坐标统一采用 CSS 像素。
      *
-     * 当前版本优先稳定性。
+     * 不使用 devicePixelRatio，
+     * 避免 Canvas 内部坐标与鼠标坐标不一致。
      */
 
-    if (dpr !== 1) {
+    const targetWidth =
+        Math.round(width);
+
+    const targetHeight =
+        Math.round(height);
+
+
+    if (
+        canvas.width !== targetWidth ||
+        canvas.height !== targetHeight
+    ) {
 
         canvas.width =
-            rect.width;
+            targetWidth;
 
         canvas.height =
-            rect.height;
+            targetHeight;
 
     }
+
+
+    canvas.style.width =
+        `${targetWidth}px`;
+
+    canvas.style.height =
+        `${targetHeight}px`;
 
 }
 
 
+// 第一次确定 Canvas 大小
 resizeCanvas();
-
-
-window.addEventListener(
-    "resize",
-    () => {
-
-        resizeCanvas();
-
-        render();
-
-    }
-);
 
 
 // ============================================================
@@ -207,7 +221,6 @@ const factionSelection =
 let scenario =
     null;
 
-
 let units =
     [];
 
@@ -220,6 +233,70 @@ function render() {
 
     renderer.render(
         units
+    );
+
+}
+
+
+// ============================================================
+// Canvas 自适应
+// ============================================================
+
+function handleCanvasResize() {
+
+    const oldWidth =
+        canvas.width;
+
+    const oldHeight =
+        canvas.height;
+
+
+    resizeCanvas();
+
+
+    if (
+        oldWidth !== canvas.width ||
+        oldHeight !== canvas.height
+    ) {
+
+        render();
+
+    }
+
+}
+
+
+window.addEventListener(
+    "resize",
+    handleCanvasResize
+);
+
+
+/*
+ * ResizeObserver 可以检测：
+ *
+ * 浏览器尺寸变化
+ * Sidebar 尺寸变化
+ * mapArea 尺寸变化
+ */
+
+if (
+    typeof ResizeObserver !==
+    "undefined"
+) {
+
+    const resizeObserver =
+        new ResizeObserver(
+            () => {
+
+                handleCanvasResize();
+
+            }
+        );
+
+
+    resizeObserver.observe(
+        mapArea
     );
 
 }
@@ -322,7 +399,13 @@ async function loadScenario() {
 
 
         /*
-         * 兼容不同数据结构
+         * 兼容两种数据结构：
+         *
+         * scenario.units
+         *
+         * 或
+         *
+         * scenario.forces
          */
 
         if (
@@ -369,6 +452,12 @@ async function loadScenario() {
             units
         );
 
+
+        /*
+         * scenario 加载完成后再次确认尺寸。
+         */
+
+        resizeCanvas();
 
         render();
 
@@ -434,14 +523,11 @@ async function loadScenario() {
 let dragging =
     false;
 
-
 let lastMouseX =
     0;
 
-
 let lastMouseY =
     0;
-
 
 let dragDistance =
     0;
@@ -461,7 +547,6 @@ canvas.addEventListener(
 
         lastMouseX =
             event.clientX;
-
 
         lastMouseY =
             event.clientY;
@@ -491,7 +576,6 @@ window.addEventListener(
             event.clientX -
             lastMouseX;
 
-
         const dy =
             event.clientY -
             lastMouseY;
@@ -507,14 +591,12 @@ window.addEventListener(
         camera.x +=
             dx;
 
-
         camera.y +=
             dy;
 
 
         lastMouseX =
             event.clientX;
-
 
         lastMouseY =
             event.clientY;
@@ -561,7 +643,6 @@ canvas.addEventListener(
             event.clientX -
             rect.left;
 
-
         const mouseY =
             event.clientY -
             rect.top;
@@ -593,7 +674,8 @@ canvas.addEventListener(
 
 
         /*
-         * 鼠标所在地图位置保持不变。
+         * 鼠标指向的地图位置
+         * 在缩放前后保持不动。
          */
 
         const worldX =
@@ -649,7 +731,8 @@ canvas.addEventListener(
     event => {
 
         /*
-         * 尚未选择阵营时不允许操作。
+         * 尚未选择阵营时，
+         * 不允许地图操作。
          */
 
         if (
@@ -663,8 +746,8 @@ canvas.addEventListener(
 
 
         /*
-         * 如果刚刚进行了拖动，
-         * 不把鼠标释放解释为点击。
+         * 刚刚拖动过地图时，
+         * 不解释为点击。
          */
 
         if (
@@ -689,14 +772,13 @@ canvas.addEventListener(
             event.clientX -
             rect.left;
 
-
         const mouseY =
             event.clientY -
             rect.top;
 
 
         // ====================================================
-        // 第一优先级：单位
+        // 第一优先级：点击单位
         // ====================================================
 
         const clickedUnit =
@@ -721,31 +803,39 @@ canvas.addEventListener(
 
 
             /*
-             * 只有玩家自己的单位
-             * 才能进入移动状态。
+             * 判断观察员模式。
              */
 
             const observer =
                 typeof gameState
                     .isObserver ===
-                    "function"
-                    &&
+                "function"
+                &&
                 gameState
                     .isObserver();
 
 
+            /*
+             * 判断是否属于玩家。
+             */
+
             const friendly =
                 typeof gameState
                     .isPlayerUnit ===
-                    "function"
-                    ?
-                    gameState
-                        .isPlayerUnit(
-                            clickedUnit
-                        )
-                    :
-                    true;
+                "function"
+                ?
+                gameState
+                    .isPlayerUnit(
+                        clickedUnit
+                    )
+                :
+                true;
 
+
+            /*
+             * 只有玩家自己的单位
+             * 才进入移动模式。
+             */
 
             if (
                 !observer &&
@@ -779,7 +869,7 @@ canvas.addEventListener(
 
 
         // ====================================================
-        // 第二优先级：地图 Hex
+        // 第二优先级：点击地图 Hex
         // ====================================================
 
         if (
@@ -788,9 +878,9 @@ canvas.addEventListener(
         ) {
 
             /*
-             * 屏幕坐标
+             * Screen
              * ↓
-             * 世界坐标
+             * World
              */
 
             const worldX =
@@ -812,7 +902,7 @@ canvas.addEventListener(
 
 
             /*
-             * 世界坐标
+             * World
              * ↓
              * Hex
              */
@@ -854,7 +944,7 @@ canvas.addEventListener(
 
 
                     /*
-                     * 更新右侧资料。
+                     * 移动后刷新右侧资料。
                      */
 
                     selection.select(
@@ -892,7 +982,7 @@ canvas.addEventListener(
 
 
 // ============================================================
-// 防止右键菜单干扰
+// 右键取消移动
 // ============================================================
 
 canvas.addEventListener(
@@ -925,7 +1015,6 @@ window.addEventListener(
         ) {
 
             movementSystem.clear();
-
 
             render();
 
