@@ -1,12 +1,26 @@
+/* ============================================================
+   东线 1941
+   style.css
+   V0.4
+   ============================================================ */
+
+
+/* ============================================================
+   全局
+   ============================================================ */
+
 * {
     box-sizing: border-box;
 }
 
+
 html,
 body {
     margin: 0;
+
     width: 100%;
     height: 100%;
+
     overflow: hidden;
 
     font-family:
@@ -19,17 +33,29 @@ body {
 }
 
 
+/* ============================================================
+   游戏整体
+   ============================================================ */
+
 #game {
     display: flex;
     flex-direction: column;
 
     width: 100vw;
     height: 100vh;
+
+    overflow: hidden;
 }
 
 
+/* ============================================================
+   顶部状态栏
+   ============================================================ */
+
 #topbar {
     height: 52px;
+
+    flex: 0 0 52px;
 
     display: flex;
     align-items: center;
@@ -41,11 +67,14 @@ body {
     color: #e8e3d5;
 
     border-bottom: 1px solid #555;
+
+    user-select: none;
 }
 
 
 #topbar strong {
     font-size: 20px;
+    font-weight: bold;
 }
 
 
@@ -58,39 +87,93 @@ body {
 }
 
 
-#main {
-    flex: 1;
+#turnInfo {
+    font-size: 14px;
 
-    min-height: 0;
-
-    display: flex;
+    white-space: nowrap;
 }
 
 
-#mapArea {
-    flex: 1;
+/* ============================================================
+   游戏主体
+   ============================================================ */
+
+#main {
+    flex: 1 1 auto;
 
     min-width: 0;
+    min-height: 0;
 
+    display: flex;
+
+    overflow: hidden;
+}
+
+
+/* ============================================================
+   地图区域
+   ============================================================ */
+
+#mapArea {
     position: relative;
+
+    flex: 1 1 auto;
+
+    min-width: 0;
+    min-height: 0;
+
+    overflow: hidden;
 
     background: #87866e;
 }
 
 
-#gameCanvas {
+/* ============================================================
+   Canvas
+
+   注意：
+   HTML / CSS / JavaScript 统一使用 game-canvas
+   ============================================================ */
+
+#game-canvas {
     display: block;
 
     width: 100%;
     height: 100%;
+
+    margin: 0;
+    padding: 0;
+
+    background: #87866e;
+
+    cursor: default;
+
+    user-select: none;
+    touch-action: none;
 }
 
 
+/* 拖动地图时可以由 JS 添加该 class */
+
+#game-canvas.dragging {
+    cursor: grabbing;
+}
+
+
+/* ============================================================
+   右侧信息栏
+   ============================================================ */
+
 #sidebar {
-    width: 280px;
+    width: 300px;
+
+    flex: 0 0 300px;
+
+    min-width: 300px;
 
     padding: 18px;
 
+    overflow-x: hidden;
     overflow-y: auto;
 
     background: #e3ddc9;
@@ -100,9 +183,35 @@ body {
 }
 
 
-#sidebar h2,
+/* ============================================================
+   信息面板
+   ============================================================ */
+
+#info-panel {
+    width: 100%;
+}
+
+
+#sidebar h2 {
+    margin-top: 0;
+    margin-bottom: 16px;
+
+    font-size: 24px;
+}
+
+
 #sidebar h3 {
     margin-top: 0;
+    margin-bottom: 12px;
+
+    font-size: 18px;
+}
+
+
+#sidebar p {
+    margin: 10px 0;
+
+    line-height: 1.5;
 }
 
 
@@ -110,21 +219,117 @@ body {
     margin: 20px 0;
 
     border: none;
+
     border-top: 1px solid #aaa58f;
 }
 
 
+/* ============================================================
+   提示文字
+   ============================================================ */
+
+.hint {
+    opacity: 0.75;
+
+    line-height: 1.6;
+}
+
+
+/* ============================================================
+   单位信息
+   ============================================================ */
+
 .unit-title {
+    margin-bottom: 10px;
+
     font-size: 18px;
     font-weight: bold;
-
-    margin-bottom: 10px;
 }
 
 
 .unit-row {
     display: flex;
+
+    align-items: center;
     justify-content: space-between;
 
-    margin: 6px 0;
+    gap: 16px;
+
+    margin: 7px 0;
+
+    line-height: 1.4;
+}
+
+
+.unit-row span {
+    opacity: 0.75;
+}
+
+
+.unit-row strong {
+    text-align: right;
+
+    font-weight: bold;
+}
+
+
+/* ============================================================
+   滚动条
+   ============================================================ */
+
+#sidebar::-webkit-scrollbar {
+    width: 8px;
+}
+
+
+#sidebar::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+
+#sidebar::-webkit-scrollbar-thumb {
+    background: rgba(70, 70, 60, 0.35);
+
+    border-radius: 4px;
+}
+
+
+#sidebar::-webkit-scrollbar-thumb:hover {
+    background: rgba(70, 70, 60, 0.55);
+}
+
+
+/* ============================================================
+   小屏幕
+   ============================================================ */
+
+@media (max-width: 900px) {
+
+    #sidebar {
+        width: 250px;
+
+        flex-basis: 250px;
+
+        min-width: 250px;
+
+        padding: 14px;
+    }
+
+
+    #topbar {
+        padding: 0 12px;
+    }
+
+
+    #topbar strong {
+        font-size: 18px;
+    }
+
+
+    .subtitle {
+        margin-left: 8px;
+
+        font-size: 12px;
+    }
+
 }
