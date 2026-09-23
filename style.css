@@ -333,3 +333,63 @@ body {
     }
 
 }
+/* =========================================================
+   回合系统
+   ========================================================= */
+
+#turnPanel {
+    margin-top: 18px;
+}
+
+#turnPanel h3 {
+    margin-bottom: 14px;
+}
+
+.turn-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    margin: 8px 0;
+
+    font-size: 15px;
+}
+
+.turn-row span {
+    opacity: 0.75;
+}
+
+.turn-row strong {
+    font-weight: bold;
+}
+
+
+#endPhaseButton {
+    width: 100%;
+
+    margin-top: 16px;
+    padding: 11px 12px;
+
+    font-family:
+        "FangSong",
+        "仿宋",
+        "SimSun",
+        serif;
+
+    font-size: 16px;
+
+    color: #eee8d8;
+    background: #343a34;
+
+    border: 1px solid #676b5d;
+
+    cursor: pointer;
+}
+
+#endPhaseButton:hover {
+    background: #454c43;
+}
+
+#endPhaseButton:active {
+    transform: translateY(1px);
+}
