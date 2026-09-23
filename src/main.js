@@ -1,6 +1,7 @@
 // ============================================================
 // main.js
-// 东线 1941 V0.5
+// 东线 1941：杜布诺
+// V0.6
 // ============================================================
 
 import { WorldMap } from "./WorldMap.js";
@@ -59,8 +60,10 @@ if (!canvas) {
 const world =
     new WorldMap();
 
+
 const camera =
     new Camera();
+
 
 const renderer =
     new Renderer(
@@ -69,8 +72,10 @@ const renderer =
         camera
     );
 
+
 const gameState =
     new GameState();
+
 
 const selection =
     new UnitSelection(
@@ -78,10 +83,12 @@ const selection =
         gameState
     );
 
+
 const movementSystem =
     new MovementSystem(
         world
     );
+
 
 const factionSelection =
     new FactionSelection(
@@ -92,6 +99,11 @@ const factionSelection =
 // Renderer 读取移动系统
 renderer.movementSystem =
     movementSystem;
+
+
+// 如果 Renderer 支持 selection，直接连接
+renderer.selection =
+    selection;
 
 
 // ============================================================
@@ -120,6 +132,10 @@ let lastMouseX = 0;
 let lastMouseY = 0;
 
 
+// 防止极小的鼠标抖动被识别成拖动
+const DRAG_THRESHOLD = 4;
+
+
 // ============================================================
 // Canvas
 // ============================================================
@@ -130,37 +146,49 @@ function resizeCanvas() {
         mapArea ??
         canvas.parentElement;
 
+
     if (!container) {
+
         return;
+
     }
+
 
     const rect =
         container.getBoundingClientRect();
 
-    const dpr =
-        window.devicePixelRatio || 1;
+
+    /*
+     * 当前 Renderer / UnitSelection 使用 CSS 像素坐标。
+     *
+     * 因此这里保持 Canvas 内部尺寸与 CSS 尺寸一致，
+     * 避免 DPR=2 时出现：
+     *
+     * 视觉位置正确
+     * 但点击位置偏移
+     */
 
     canvas.width =
         Math.max(
             1,
-            Math.floor(
-                rect.width * dpr
-            )
+            Math.floor(rect.width)
         );
+
 
     canvas.height =
         Math.max(
             1,
-            Math.floor(
-                rect.height * dpr
-            )
+            Math.floor(rect.height)
         );
+
 
     canvas.style.width =
         `${rect.width}px`;
 
+
     canvas.style.height =
         `${rect.height}px`;
+
 }
 
 
@@ -170,9 +198,16 @@ function resizeCanvas() {
 
 function render() {
 
-    renderer.render(
-        units
-    );
+    if (
+        typeof renderer.render ===
+        "function"
+    ) {
+
+        renderer.render(
+            units
+        );
+
+    }
 
 }
 
@@ -196,6 +231,7 @@ function normalizeSide(side) {
         value === "german" ||
         value === "germany" ||
         value === "axis" ||
+        value === "de" ||
         value === "德军"
     ) {
 
@@ -208,6 +244,8 @@ function normalizeSide(side) {
         value === "ussr" ||
         value === "soviet" ||
         value === "redarmy" ||
+        value === "red_army" ||
+        value === "su" ||
         value === "苏军" ||
         value === "红军"
     ) {
@@ -217,7 +255,17 @@ function normalizeSide(side) {
     }
 
 
+    if (
+        value === "observer"
+    ) {
+
+        return "observer";
+
+    }
+
+
     return value;
+
 }
 
 
@@ -227,11 +275,19 @@ function normalizeSide(side) {
 
 function getUnitSide(unit) {
 
+    if (!unit) {
+
+        return "";
+
+    }
+
+
     return normalizeSide(
 
-        unit?.side ??
-        unit?.faction ??
-        unit?.camp
+        unit.side ??
+        unit.faction ??
+        unit.camp ??
+        unit.nation
 
     );
 
@@ -239,17 +295,33 @@ function getUnitSide(unit) {
 
 
 // ============================================================
-// 玩家阵营
+// 获取玩家阵营
 // ============================================================
 
 function getPlayerSide() {
 
     return normalizeSide(
 
+        gameState.playerFaction ??
         gameState.playerSide ??
         gameState.side ??
         gameState.faction
 
+    );
+
+}
+
+
+// ============================================================
+// 判断观察员模式
+// ============================================================
+
+function isObserverMode() {
+
+    return (
+        gameState.mode === "observer" ||
+        gameState.observerMode === true ||
+        getPlayerSide() === "observer"
     );
 
 }
@@ -263,13 +335,13 @@ function initializeUnits() {
 
     for (const unit of units) {
 
-
-        // ----------------------------
-        // 阵营标准化
-        // ----------------------------
+        // ----------------------------------------------------
+        // 阵营
+        // ----------------------------------------------------
 
         const side =
             getUnitSide(unit);
+
 
         if (side) {
 
@@ -279,9 +351,20 @@ function initializeUnits() {
         }
 
 
-        // ----------------------------
+        // ----------------------------------------------------
+        // 坐标
+        // ----------------------------------------------------
+
+        unit.q =
+            Number(unit.q ?? 0);
+
+        unit.r =
+            Number(unit.r ?? 0);
+
+
+        // ----------------------------------------------------
         // 移动系统
-        // ----------------------------
+        // ----------------------------------------------------
 
         if (
             typeof movementSystem.initializeUnit ===
@@ -295,9 +378,9 @@ function initializeUnits() {
         }
 
 
-        // ----------------------------
-        // 默认战斗状态
-        // ----------------------------
+        // ----------------------------------------------------
+        // 默认状态
+        // ----------------------------------------------------
 
         if (unit.morale == null) {
 
@@ -305,11 +388,13 @@ function initializeUnits() {
 
         }
 
+
         if (unit.suppression == null) {
 
             unit.suppression = 0;
 
         }
+
 
         if (unit.fatigue == null) {
 
@@ -317,9 +402,47 @@ function initializeUnits() {
 
         }
 
+
         if (unit.ammunition == null) {
 
             unit.ammunition = 100;
+
+        }
+
+
+        // ----------------------------------------------------
+        // AP 兼容
+        // ----------------------------------------------------
+
+        if (
+            unit.actionPoints == null &&
+            unit.ap != null
+        ) {
+
+            unit.actionPoints =
+                Number(unit.ap);
+
+        }
+
+
+        if (
+            unit.maxActionPoints == null &&
+            unit.maxAP != null
+        ) {
+
+            unit.maxActionPoints =
+                Number(unit.maxAP);
+
+        }
+
+
+        if (
+            unit.maxActionPoints == null &&
+            unit.actionPoints != null
+        ) {
+
+            unit.maxActionPoints =
+                Number(unit.actionPoints);
 
         }
 
@@ -356,9 +479,9 @@ function initializeTurnSystem() {
         });
 
 
-    // --------------------------------
-    // 阶段改变
-    // --------------------------------
+    // --------------------------------------------------------
+    // 阶段变化
+    // --------------------------------------------------------
 
     turnSystem.onPhaseChanged =
         () => {
@@ -372,9 +495,9 @@ function initializeTurnSystem() {
         };
 
 
-    // --------------------------------
-    // 回合改变
-    // --------------------------------
+    // --------------------------------------------------------
+    // 回合变化
+    // --------------------------------------------------------
 
     turnSystem.onTurnChanged =
         () => {
@@ -386,9 +509,9 @@ function initializeTurnSystem() {
         };
 
 
-    // --------------------------------
-    // 时间改变
-    // --------------------------------
+    // --------------------------------------------------------
+    // 时间变化
+    // --------------------------------------------------------
 
     turnSystem.onTimeChanged =
         () => {
@@ -404,19 +527,45 @@ function initializeTurnSystem() {
 
 
 // ============================================================
+// 获取当前阶段
+// ============================================================
+
+function getCurrentPhase() {
+
+    if (!turnSystem) {
+
+        return "german";
+
+    }
+
+
+    return normalizeSide(
+
+        turnSystem.phase ??
+        turnSystem.currentPhase ??
+        turnSystem.side
+
+    );
+
+}
+
+
+// ============================================================
 // 回合 UI
 // ============================================================
 
 function updateTurnUI() {
 
     if (!turnSystem) {
+
         return;
+
     }
 
 
-    // ========================================================
-    // 顶部栏
-    // ========================================================
+    // --------------------------------------------------------
+    // 顶部时间
+    // --------------------------------------------------------
 
     if (turnInfo) {
 
@@ -430,20 +579,32 @@ function updateTurnUI() {
 
         }
 
+        else {
+
+            turnInfo.textContent =
+                "1941年6月26日 · 08:00";
+
+        }
+
     }
 
 
-    // ========================================================
-    // 回合
-    // ========================================================
+    // --------------------------------------------------------
+    // 回合编号
+    // --------------------------------------------------------
 
     const number =
+
         typeof turnSystem.getTurnNumber ===
         "function"
 
             ? turnSystem.getTurnNumber()
 
-            : turnSystem.turn ?? 1;
+            : (
+                turnSystem.turn ??
+                turnSystem.turnNumber ??
+                1
+            );
 
 
     if (turnNumber) {
@@ -454,9 +615,9 @@ function updateTurnUI() {
     }
 
 
-    // ========================================================
-    // 时间
-    // ========================================================
+    // --------------------------------------------------------
+    // 时间段
+    // --------------------------------------------------------
 
     if (turnTime) {
 
@@ -470,17 +631,22 @@ function updateTurnUI() {
 
         }
 
+        else {
+
+            turnTime.textContent =
+                "08:00—10:00";
+
+        }
+
     }
 
 
-    // ========================================================
-    // 阶段
-    // ========================================================
+    // --------------------------------------------------------
+    // 行动方
+    // --------------------------------------------------------
 
     const phase =
-        normalizeSide(
-            turnSystem.phase
-        );
+        getCurrentPhase();
 
 
     const phaseName =
@@ -493,24 +659,34 @@ function updateTurnUI() {
 
     if (turnPhase) {
 
-        turnPhase.textContent =
+        if (
             typeof turnSystem.getPhaseName ===
             "function"
+        ) {
 
-                ? turnSystem.getPhaseName()
+            turnPhase.textContent =
+                turnSystem.getPhaseName();
 
-                : phaseName;
+        }
+
+        else {
+
+            turnPhase.textContent =
+                phaseName;
+
+        }
 
     }
 
 
-    // ========================================================
-    // 按钮
-    // ========================================================
+    // --------------------------------------------------------
+    // 结束阶段按钮
+    // --------------------------------------------------------
 
     if (endPhaseButton) {
 
         endPhaseButton.textContent =
+
             phase === "soviet"
 
                 ? "结束苏军行动"
@@ -523,18 +699,22 @@ function updateTurnUI() {
 
 
 // ============================================================
-// 单位是否属于当前行动阶段
+// 单位是否属于当前行动方
 // ============================================================
 
 function isUnitActive(unit) {
 
     if (!unit) {
+
         return false;
+
     }
 
 
     if (!turnSystem) {
+
         return true;
+
     }
 
 
@@ -543,18 +723,29 @@ function isUnitActive(unit) {
         "function"
     ) {
 
-        return turnSystem.isUnitActive(
-            unit
-        );
+        try {
+
+            return turnSystem.isUnitActive(
+                unit
+            );
+
+        }
+
+        catch (error) {
+
+            console.warn(
+                "TurnSystem.isUnitActive() 调用失败：",
+                error
+            );
+
+        }
 
     }
 
 
     return (
         getUnitSide(unit) ===
-        normalizeSide(
-            turnSystem.phase
-        )
+        getCurrentPhase()
     );
 
 }
@@ -567,25 +758,22 @@ function isUnitActive(unit) {
 function playerCanControlUnit(unit) {
 
     if (!unit) {
+
         return false;
+
     }
 
 
-    // 当前行动方检查
+    // 观察员模式只观察
+    if (isObserverMode()) {
 
+        return false;
+
+    }
+
+
+    // 必须是当前行动方
     if (!isUnitActive(unit)) {
-
-        return false;
-
-    }
-
-
-    // 观察员不能移动
-
-    if (
-        gameState.mode ===
-        "observer"
-    ) {
 
         return false;
 
@@ -596,10 +784,12 @@ function playerCanControlUnit(unit) {
         getPlayerSide();
 
 
-    // 没有阵营信息时
-    // 允许当前行动方操作
-
-    if (!playerSide) {
+    // GameState 没记录玩家阵营时
+    // 暂时允许当前行动方操作
+    if (
+        !playerSide ||
+        playerSide === "player"
+    ) {
 
         return true;
 
@@ -621,12 +811,17 @@ function playerCanControlUnit(unit) {
 function playerCanViewUnit(unit) {
 
     if (!unit) {
+
         return false;
+
     }
 
 
-    // 目前允许查看所有单位
-    // 战争迷雾以后再处理
+    /*
+     * V0.6 暂时允许查看双方单位。
+     *
+     * 战争迷雾之后在这里接入。
+     */
 
     return true;
 
@@ -657,6 +852,58 @@ function clearReachable() {
 
     }
 
+
+    if (
+        movementSystem.reachableHexes instanceof Map
+    ) {
+
+        movementSystem.reachableHexes.clear();
+
+    }
+
+}
+
+
+// ============================================================
+// 同步选择状态
+// ============================================================
+
+function syncSelectedUnit(unit) {
+
+    selectedUnit =
+        unit ?? null;
+
+
+    /*
+     * 这是这次的重要修改之一：
+     *
+     * main.js
+     * UnitSelection
+     * Renderer
+     *
+     * 三者必须共享同一个 selectedUnit。
+     */
+
+    selection.selectedUnit =
+        selectedUnit;
+
+
+    if (
+        typeof renderer.setSelectedUnit ===
+        "function"
+    ) {
+
+        renderer.setSelectedUnit(
+            selectedUnit
+        );
+
+    }
+
+
+    // 部分 Renderer 直接读取 selection
+    renderer.selection =
+        selection;
+
 }
 
 
@@ -674,21 +921,27 @@ function clearSelection() {
         "function"
     ) {
 
-        selection.clear();
+        try {
+
+            selection.clear();
+
+        }
+
+        catch (error) {
+
+            console.warn(
+                "selection.clear() 调用失败：",
+                error
+            );
+
+        }
 
     }
 
 
-    if (
-        typeof renderer.setSelectedUnit ===
-        "function"
-    ) {
-
-        renderer.setSelectedUnit(
-            null
-        );
-
-    }
+    syncSelectedUnit(
+        null
+    );
 
 
     clearReachable();
@@ -700,6 +953,56 @@ function clearSelection() {
             "点击地图上的单位查看详情";
 
     }
+
+}
+
+
+// ============================================================
+// 获取 AP
+// ============================================================
+
+function getUnitAP(unit) {
+
+    if (!unit) {
+
+        return 0;
+
+    }
+
+
+    return Number(
+
+        unit.actionPoints ??
+        unit.ap ??
+        0
+
+    );
+
+}
+
+
+// ============================================================
+// 获取最大 AP
+// ============================================================
+
+function getUnitMaxAP(unit) {
+
+    if (!unit) {
+
+        return 0;
+
+    }
+
+
+    return Number(
+
+        unit.maxActionPoints ??
+        unit.maxAP ??
+        unit.actionPoints ??
+        unit.ap ??
+        0
+
+    );
 
 }
 
@@ -754,17 +1057,11 @@ function showUnitInfo(unit) {
 
 
     const ap =
-
-        unit.actionPoints ??
-        unit.ap ??
-        "—";
+        getUnitAP(unit);
 
 
     const maxAP =
-
-        unit.maxActionPoints ??
-        unit.maxAP ??
-        "—";
+        getUnitMaxAP(unit);
 
 
     const active =
@@ -779,67 +1076,45 @@ function showUnitInfo(unit) {
             ${name}
         </div>
 
-
         <div class="unit-row">
             <span>阵营</span>
             <strong>${sideName}</strong>
         </div>
-
 
         <div class="unit-row">
             <span>兵种</span>
             <strong>${type}</strong>
         </div>
 
-
         <div class="unit-row">
             <span>行动点</span>
-            <strong>
-                ${ap} / ${maxAP}
-            </strong>
+            <strong>${ap} / ${maxAP}</strong>
         </div>
-
 
         <div class="unit-row">
             <span>士气</span>
-            <strong>
-                ${unit.morale ?? "—"}
-            </strong>
+            <strong>${unit.morale ?? "—"}</strong>
         </div>
-
 
         <div class="unit-row">
             <span>压制</span>
-            <strong>
-                ${unit.suppression ?? "—"}
-            </strong>
+            <strong>${unit.suppression ?? "—"}</strong>
         </div>
-
 
         <div class="unit-row">
             <span>疲劳</span>
-            <strong>
-                ${unit.fatigue ?? "—"}
-            </strong>
+            <strong>${unit.fatigue ?? "—"}</strong>
         </div>
-
 
         <div class="unit-row">
             <span>弹药</span>
-            <strong>
-                ${unit.ammunition ?? "—"}
-            </strong>
+            <strong>${unit.ammunition ?? "—"}</strong>
         </div>
-
 
         <div class="unit-row">
             <span>位置</span>
-            <strong>
-                ${unit.q},
-                ${unit.r}
-            </strong>
+            <strong>${unit.q}, ${unit.r}</strong>
         </div>
-
 
         <div class="unit-row">
             <span>状态</span>
@@ -867,12 +1142,18 @@ function calculateReachable(unit) {
 
 
     if (!unit) {
+
         return;
+
     }
 
 
     let result = null;
 
+
+    // --------------------------------------------------------
+    // 尝试 MovementSystem 的不同接口
+    // --------------------------------------------------------
 
     if (
         typeof movementSystem.calculateReachable ===
@@ -881,7 +1162,8 @@ function calculateReachable(unit) {
 
         result =
             movementSystem.calculateReachable(
-                unit
+                unit,
+                units
             );
 
     }
@@ -893,7 +1175,8 @@ function calculateReachable(unit) {
 
         result =
             movementSystem.computeReachable(
-                unit
+                unit,
+                units
             );
 
     }
@@ -905,7 +1188,8 @@ function calculateReachable(unit) {
 
         result =
             movementSystem.getReachableHexes(
-                unit
+                unit,
+                units
             );
 
     }
@@ -919,7 +1203,9 @@ function calculateReachable(unit) {
     }
 
 
-    // Renderer 同步移动范围
+    // --------------------------------------------------------
+    // Renderer
+    // --------------------------------------------------------
 
     if (
         typeof renderer.setReachable ===
@@ -927,7 +1213,11 @@ function calculateReachable(unit) {
     ) {
 
         renderer.setReachable(
-            movementSystem.reachable
+
+            result ??
+            movementSystem.reachable ??
+            movementSystem.reachableHexes
+
         );
 
     }
@@ -942,42 +1232,63 @@ function calculateReachable(unit) {
 function selectUnit(unit) {
 
     if (!unit) {
+
         return;
+
     }
 
 
-    selectedUnit =
-        unit;
-
+    // --------------------------------------------------------
+    // UnitSelection
+    // --------------------------------------------------------
 
     if (
         typeof selection.select ===
         "function"
     ) {
 
-        selection.select(
-            unit
-        );
+        try {
+
+            selection.select(
+                unit
+            );
+
+        }
+
+        catch (error) {
+
+            console.warn(
+                "selection.select() 调用失败：",
+                error
+            );
+
+        }
 
     }
 
 
-    if (
-        typeof renderer.setSelectedUnit ===
-        "function"
-    ) {
+    /*
+     * 无论 UnitSelection.select() 内部怎么实现，
+     * 这里都强制同步状态。
+     */
 
-        renderer.setSelectedUnit(
-            unit
-        );
+    syncSelectedUnit(
+        unit
+    );
 
-    }
 
+    // --------------------------------------------------------
+    // 单位信息
+    // --------------------------------------------------------
 
     showUnitInfo(
         unit
     );
 
+
+    // --------------------------------------------------------
+    // 移动范围
+    // --------------------------------------------------------
 
     if (
         playerCanControlUnit(
@@ -1004,7 +1315,7 @@ function selectUnit(unit) {
 
 
 // ============================================================
-// 查找 Hex 上单位
+// Hex 上查找单位
 // ============================================================
 
 function unitAtHex(q, r) {
@@ -1027,6 +1338,31 @@ function unitAtHex(q, r) {
 
 
 // ============================================================
+// Canvas 鼠标坐标
+// ============================================================
+
+function getCanvasMousePosition(event) {
+
+    const rect =
+        canvas.getBoundingClientRect();
+
+
+    return {
+
+        x:
+            event.clientX -
+            rect.left,
+
+        y:
+            event.clientY -
+            rect.top
+
+    };
+
+}
+
+
+// ============================================================
 // 屏幕 -> 世界坐标
 // ============================================================
 
@@ -1035,22 +1371,56 @@ function screenToWorld(
     screenY
 ) {
 
+    /*
+     * 如果 Renderer 已经提供转换函数，
+     * 优先使用 Renderer。
+     */
+
+    if (
+        typeof renderer.screenToWorld ===
+        "function"
+    ) {
+
+        const result =
+            renderer.screenToWorld(
+                screenX,
+                screenY
+            );
+
+
+        if (result) {
+
+            return result;
+
+        }
+
+    }
+
+
     const zoom =
-        camera.zoom ?? 1;
+        Number(
+            camera.zoom ?? 1
+        );
 
 
     const offsetX =
+        Number(
 
-        camera.x ??
-        camera.offsetX ??
-        0;
+            camera.x ??
+            camera.offsetX ??
+            0
+
+        );
 
 
     const offsetY =
+        Number(
 
-        camera.y ??
-        camera.offsetY ??
-        0;
+            camera.y ??
+            camera.offsetY ??
+            0
+
+        );
 
 
     return {
@@ -1078,52 +1448,297 @@ function screenToWorld(
 
 function mouseToHex(event) {
 
-    const rect =
-        canvas.getBoundingClientRect();
+    const mouse =
+        getCanvasMousePosition(
+            event
+        );
 
 
-    const mouseX =
-        event.clientX -
-        rect.left;
-
-
-    const mouseY =
-        event.clientY -
-        rect.top;
-
-
-    const world =
+    const worldPoint =
         screenToWorld(
-            mouseX,
-            mouseY
+            mouse.x,
+            mouse.y
         );
 
 
     const hexSize =
+        Number(
 
-        renderer.hexSize ??
-        renderer.size ??
-        18;
+            renderer.hexSize ??
+            renderer.size ??
+            world.hexSize ??
+            18
+
+        );
 
 
-    return pixelToHex(
+    const result =
+        pixelToHex(
 
-        world.x,
+            worldPoint.x,
 
-        world.y,
+            worldPoint.y,
 
-        hexSize
+            hexSize
 
-    );
+        );
+
+
+    if (!result) {
+
+        return null;
+
+    }
+
+
+    return {
+
+        q:
+            Math.round(
+                Number(result.q)
+            ),
+
+        r:
+            Math.round(
+                Number(result.r)
+            )
+
+    };
 
 }
 
 
 // ============================================================
-// 点击单位检测
+// 单位点击检测
 // ============================================================
 
 function findUnitAtMouse(event) {
+
+    const mouse =
+        getCanvasMousePosition(
+            event
+        );
+
+
+    /*
+     * ========================================================
+     * 第一优先级：
+     *
+     * UnitSelection.findUnitAt()
+     *
+     * 这是本次最重要的修复。
+     *
+     * 单位最终显示在哪里，
+     * UnitSelection 就在哪里进行屏幕命中检测。
+     *
+     * 不再：
+     *
+     * 鼠标
+     * ↓
+     * 世界坐标
+     * ↓
+     * Hex
+     * ↓
+     * 单位
+     *
+     * 才判断是否点击单位。
+     * ========================================================
+     */
+
+    if (
+        typeof selection.findUnitAt ===
+        "function"
+    ) {
+
+        try {
+
+            const found =
+                selection.findUnitAt(
+
+                    mouse.x,
+
+                    mouse.y,
+
+                    units,
+
+                    camera,
+
+                    renderer
+
+                );
+
+
+            if (found) {
+
+                return found;
+
+            }
+
+        }
+
+        catch (error) {
+
+            console.warn(
+                "UnitSelection.findUnitAt() 调用失败：",
+                error
+            );
+
+        }
+
+    }
+
+
+    /*
+     * ========================================================
+     * 第二优先级：
+     *
+     * 直接按照 Renderer 实际单位屏幕位置进行命中检测。
+     *
+     * 这样即使 UnitSelection 接口版本不一致，
+     * 单位仍然可以点击。
+     * ========================================================
+     */
+
+    const zoom =
+        Number(
+            camera.zoom ?? 1
+        );
+
+
+    const hitWidth =
+        Math.max(
+            28,
+            54 * zoom
+        );
+
+
+    const hitHeight =
+        Math.max(
+            24,
+            42 * zoom
+        );
+
+
+    /*
+     * 倒序检查。
+     *
+     * 如果两个单位视觉上重叠，
+     * 优先选择后绘制的单位。
+     */
+
+    for (
+        let i = units.length - 1;
+        i >= 0;
+        i--
+    ) {
+
+        const unit =
+            units[i];
+
+
+        let screenPoint = null;
+
+
+        // ----------------------------------------------------
+        // Renderer.worldToScreen(q,r)
+        // ----------------------------------------------------
+
+        if (
+            typeof renderer.worldToScreen ===
+            "function"
+        ) {
+
+            try {
+
+                screenPoint =
+                    renderer.worldToScreen(
+                        unit.q,
+                        unit.r
+                    );
+
+            }
+
+            catch (error) {
+
+                // 某些 Renderer 的 worldToScreen
+                // 需要 world pixel，而不是 q/r。
+            }
+
+        }
+
+
+        // ----------------------------------------------------
+        // Renderer.hexToScreen(q,r)
+        // ----------------------------------------------------
+
+        if (
+            !screenPoint &&
+            typeof renderer.hexToScreen ===
+            "function"
+        ) {
+
+            try {
+
+                screenPoint =
+                    renderer.hexToScreen(
+                        unit.q,
+                        unit.r
+                    );
+
+            }
+
+            catch (error) {
+
+                // 忽略，继续后备方案
+            }
+
+        }
+
+
+        if (
+            !screenPoint ||
+            !Number.isFinite(screenPoint.x) ||
+            !Number.isFinite(screenPoint.y)
+        ) {
+
+            continue;
+
+        }
+
+
+        const dx =
+            Math.abs(
+                mouse.x -
+                screenPoint.x
+            );
+
+
+        const dy =
+            Math.abs(
+                mouse.y -
+                screenPoint.y
+            );
+
+
+        if (
+            dx <= hitWidth / 2 &&
+            dy <= hitHeight / 2
+        ) {
+
+            return unit;
+
+        }
+
+    }
+
+
+    /*
+     * ========================================================
+     * 最后的后备方案：
+     *
+     * Hex 命中。
+     * ========================================================
+     */
 
     const hex =
         mouseToHex(
@@ -1132,70 +1747,84 @@ function findUnitAtMouse(event) {
 
 
     if (!hex) {
+
         return null;
-    }
-
-
-    // --------------------------------------------------------
-    // 首先直接按照 Hex 查找
-    // --------------------------------------------------------
-
-    const direct =
-        unitAtHex(
-            hex.q,
-            hex.r
-        );
-
-
-    if (direct) {
-
-        return direct;
 
     }
 
 
-    // --------------------------------------------------------
-    // 兼容 UnitSelection
-    // --------------------------------------------------------
+    return unitAtHex(
+        hex.q,
+        hex.r
+    );
 
-    if (
-        typeof selection.findUnitAt ===
-        "function"
-    ) {
-
-        const rect =
-            canvas.getBoundingClientRect();
+}
 
 
-        const x =
-            event.clientX -
-            rect.left;
+// ============================================================
+// 获取移动范围数据
+// ============================================================
+
+function getReachableData(q, r) {
+
+    const key =
+        `${q},${r}`;
 
 
-        const y =
-            event.clientY -
-            rect.top;
+    const sources = [
+
+        movementSystem.reachable,
+
+        movementSystem.reachableHexes,
+
+        renderer.reachable,
+
+        renderer.reachableHexes
+
+    ];
 
 
-        const found =
-            selection.findUnitAt(
+    for (const source of sources) {
 
-                x,
+        if (!source) {
 
-                y,
+            continue;
 
-                units,
-
-                camera,
-
-                renderer
-
-            );
+        }
 
 
-        if (found) {
+        if (
+            source instanceof Map
+        ) {
 
-            return found;
+            if (
+                source.has(key)
+            ) {
+
+                return source.get(
+                    key
+                );
+
+            }
+
+        }
+
+
+        else if (
+            typeof source ===
+            "object"
+        ) {
+
+            if (
+                Object.prototype.hasOwnProperty.call(
+                    source,
+                    key
+                )
+            ) {
+
+                return source[key];
+
+            }
 
         }
 
@@ -1208,48 +1837,7 @@ function findUnitAtMouse(event) {
 
 
 // ============================================================
-// 可移动格数据
-// ============================================================
-
-function getReachableData(q, r) {
-
-    const reachable =
-        movementSystem.reachable;
-
-
-    if (!reachable) {
-
-        return null;
-
-    }
-
-
-    const key =
-        `${q},${r}`;
-
-
-    if (
-        reachable instanceof Map
-    ) {
-
-        return (
-            reachable.get(key) ??
-            null
-        );
-
-    }
-
-
-    return (
-        reachable[key] ??
-        null
-    );
-
-}
-
-
-// ============================================================
-// 移动成本
+// 获取移动成本
 // ============================================================
 
 function getMovementCost(data) {
@@ -1286,7 +1874,9 @@ function getMovementCost(data) {
         )
     ) {
 
-        return data.cost;
+        return Number(
+            data.cost
+        );
 
     }
 
@@ -1297,7 +1887,9 @@ function getMovementCost(data) {
         )
     ) {
 
-        return data.totalCost;
+        return Number(
+            data.totalCost
+        );
 
     }
 
@@ -1308,7 +1900,22 @@ function getMovementCost(data) {
         )
     ) {
 
-        return data.distance;
+        return Number(
+            data.distance
+        );
+
+    }
+
+
+    if (
+        Number.isFinite(
+            data.apCost
+        )
+    ) {
+
+        return Number(
+            data.apCost
+        );
 
     }
 
@@ -1319,10 +1926,163 @@ function getMovementCost(data) {
 
 
 // ============================================================
+// 消耗 AP
+// ============================================================
+
+function spendAP(
+    unit,
+    amount
+) {
+
+    if (!unit) {
+
+        return;
+
+    }
+
+
+    const cost =
+        Math.max(
+            0,
+            Number(amount) || 0
+        );
+
+
+    if (
+        turnSystem &&
+        typeof turnSystem.registerMove ===
+        "function"
+    ) {
+
+        try {
+
+            turnSystem.registerMove(
+                unit,
+                cost
+            );
+
+            return;
+
+        }
+
+        catch (error) {
+
+            console.warn(
+                "TurnSystem.registerMove() 调用失败，改用本地 AP：",
+                error
+            );
+
+        }
+
+    }
+
+
+    const currentAP =
+        getUnitAP(
+            unit
+        );
+
+
+    const newAP =
+        Math.max(
+            0,
+            currentAP -
+            cost
+        );
+
+
+    if (
+        unit.actionPoints != null
+    ) {
+
+        unit.actionPoints =
+            newAP;
+
+    }
+
+
+    if (
+        unit.ap != null
+    ) {
+
+        unit.ap =
+            newAP;
+
+    }
+
+
+    if (
+        unit.actionPoints == null &&
+        unit.ap == null
+    ) {
+
+        unit.actionPoints =
+            newAP;
+
+    }
+
+}
+
+
+// ============================================================
+// AP 是否足够
+// ============================================================
+
+function canSpendAP(
+    unit,
+    amount
+) {
+
+    if (!unit) {
+
+        return false;
+
+    }
+
+
+    if (
+        turnSystem &&
+        typeof turnSystem.canSpendAP ===
+        "function"
+    ) {
+
+        try {
+
+            return turnSystem.canSpendAP(
+                unit,
+                amount
+            );
+
+        }
+
+        catch (error) {
+
+            console.warn(
+                "TurnSystem.canSpendAP() 调用失败：",
+                error
+            );
+
+        }
+
+    }
+
+
+    return (
+        getUnitAP(unit) >=
+        Number(amount)
+    );
+
+}
+
+
+// ============================================================
 // 移动单位
 // ============================================================
 
-function tryMoveSelectedUnit(q, r) {
+function tryMoveSelectedUnit(
+    q,
+    r
+) {
 
     if (!selectedUnit) {
 
@@ -1342,7 +2102,28 @@ function tryMoveSelectedUnit(q, r) {
     }
 
 
-    // 目标存在其他单位
+    // --------------------------------------------------------
+    // 原地点击
+    // --------------------------------------------------------
+
+    if (
+        Number(selectedUnit.q) ===
+        Number(q)
+
+        &&
+
+        Number(selectedUnit.r) ===
+        Number(r)
+    ) {
+
+        return false;
+
+    }
+
+
+    // --------------------------------------------------------
+    // 目标格已经有单位
+    // --------------------------------------------------------
 
     const occupyingUnit =
         unitAtHex(
@@ -1353,14 +2134,23 @@ function tryMoveSelectedUnit(q, r) {
 
     if (
         occupyingUnit &&
-        occupyingUnit !==
-            selectedUnit
+        occupyingUnit !== selectedUnit
     ) {
+
+        /*
+         * V0.6 暂时不执行攻击。
+         *
+         * 后面 CombatSystem 接在这里。
+         */
 
         return false;
 
     }
 
+
+    // --------------------------------------------------------
+    // 获取移动范围
+    // --------------------------------------------------------
 
     const reachableData =
         getReachableData(
@@ -1378,6 +2168,10 @@ function tryMoveSelectedUnit(q, r) {
     }
 
 
+    // --------------------------------------------------------
+    // 移动成本
+    // --------------------------------------------------------
+
     const movementCost =
         getMovementCost(
             reachableData
@@ -1393,144 +2187,125 @@ function tryMoveSelectedUnit(q, r) {
     }
 
 
-    // ========================================================
-    // AP 检查
-    // ========================================================
+    // --------------------------------------------------------
+    // AP
+    // --------------------------------------------------------
 
     if (
-        turnSystem &&
-        typeof turnSystem.canSpendAP ===
-        "function"
-    ) {
-
-        if (
-            !turnSystem.canSpendAP(
-                selectedUnit,
-                movementCost
-            )
-        ) {
-
-            return false;
-
-        }
-
-    }
-
-
-    // ========================================================
-    // 移动
-    // ========================================================
-
-    selectedUnit.q =
-        q;
-
-    selectedUnit.r =
-        r;
-
-
-    // ========================================================
-    // 消耗 AP
-    // ========================================================
-
-    if (
-        turnSystem &&
-        typeof turnSystem.registerMove ===
-        "function"
-    ) {
-
-        turnSystem.registerMove(
-
+        !canSpendAP(
             selectedUnit,
-
             movementCost
+        )
+    ) {
 
-        );
+        return false;
 
     }
 
-    else {
 
-        const currentAP =
+    // --------------------------------------------------------
+    // 尝试让 MovementSystem 执行移动
+    // --------------------------------------------------------
 
-            selectedUnit.actionPoints ??
-            selectedUnit.ap;
+    let movedBySystem =
+        false;
 
 
-        if (
-            Number.isFinite(
-                currentAP
-            )
-        ) {
+    if (
+        typeof movementSystem.moveUnit ===
+        "function"
+    ) {
+
+        try {
+
+            const result =
+                movementSystem.moveUnit(
+
+                    selectedUnit,
+
+                    q,
+
+                    r,
+
+                    units
+
+                );
+
+
+            /*
+             * 只要没有明确返回 false，
+             * 就认为系统完成了移动。
+             */
 
             if (
-                selectedUnit.actionPoints != null
+                result !== false
             ) {
 
-                selectedUnit.actionPoints =
-                    Math.max(
-                        0,
-                        currentAP -
-                        movementCost
-                    );
+                movedBySystem =
+                    true;
 
             }
 
-            else {
+        }
 
-                selectedUnit.ap =
-                    Math.max(
-                        0,
-                        currentAP -
-                        movementCost
-                    );
+        catch (error) {
 
-            }
+            console.warn(
+                "MovementSystem.moveUnit() 调用失败，使用 main.js 移动：",
+                error
+            );
 
         }
 
     }
 
 
-    // ========================================================
-    // 继续保持单位选中
-    // ========================================================
+    // --------------------------------------------------------
+    // 本地移动
+    // --------------------------------------------------------
 
-    if (
-        typeof selection.select ===
-        "function"
-    ) {
+    if (!movedBySystem) {
 
-        selection.select(
-            selectedUnit
-        );
+        selectedUnit.q =
+            Number(q);
 
-    }
-
-
-    if (
-        typeof renderer.setSelectedUnit ===
-        "function"
-    ) {
-
-        renderer.setSelectedUnit(
-            selectedUnit
-        );
+        selectedUnit.r =
+            Number(r);
 
     }
 
 
-    // ========================================================
+    // --------------------------------------------------------
+    // AP
+    // --------------------------------------------------------
+
+    spendAP(
+        selectedUnit,
+        movementCost
+    );
+
+
+    // --------------------------------------------------------
+    // 保持选择状态
+    // --------------------------------------------------------
+
+    syncSelectedUnit(
+        selectedUnit
+    );
+
+
+    // --------------------------------------------------------
     // 重新计算移动范围
-    // ========================================================
+    // --------------------------------------------------------
 
     calculateReachable(
         selectedUnit
     );
 
 
-    // ========================================================
-    // 更新单位信息
-    // ========================================================
+    // --------------------------------------------------------
+    // 更新信息
+    // --------------------------------------------------------
 
     showUnitInfo(
         selectedUnit
@@ -1564,13 +2339,17 @@ canvas.addEventListener(
         }
 
 
-        isDragging = true;
+        isDragging =
+            true;
 
-        dragMoved = false;
+
+        dragMoved =
+            false;
 
 
         lastMouseX =
             event.clientX;
+
 
         lastMouseY =
             event.clientY;
@@ -1581,7 +2360,7 @@ canvas.addEventListener(
 
 
 // ============================================================
-// 拖动地图
+// 鼠标移动 / 地图拖动
 // ============================================================
 
 window.addEventListener(
@@ -1608,75 +2387,90 @@ window.addEventListener(
 
 
         if (
-            Math.abs(dx) > 2 ||
-            Math.abs(dy) > 2
+            Math.abs(dx) >= DRAG_THRESHOLD ||
+            Math.abs(dy) >= DRAG_THRESHOLD
         ) {
 
-            dragMoved = true;
+            dragMoved =
+                true;
 
         }
 
 
-        if (
-            typeof camera.pan ===
-            "function"
-        ) {
+        /*
+         * 只有真正进入拖动状态后才移动地图。
+         *
+         * 这样普通点击单位时的小幅鼠标抖动
+         * 不会导致 click 被取消。
+         */
 
-            camera.pan(
-                dx,
-                dy
-            );
-
-        }
-
-        else {
+        if (dragMoved) {
 
             if (
-                Number.isFinite(
-                    camera.x
-                )
+                typeof camera.pan ===
+                "function"
             ) {
 
-                camera.x +=
-                    dx;
+                camera.pan(
+                    dx,
+                    dy
+                );
+
+            }
+
+            else {
+
+                if (
+                    Number.isFinite(
+                        camera.x
+                    )
+                ) {
+
+                    camera.x +=
+                        dx;
+
+                }
+
+
+                if (
+                    Number.isFinite(
+                        camera.y
+                    )
+                ) {
+
+                    camera.y +=
+                        dy;
+
+                }
+
+
+                if (
+                    Number.isFinite(
+                        camera.offsetX
+                    )
+                ) {
+
+                    camera.offsetX +=
+                        dx;
+
+                }
+
+
+                if (
+                    Number.isFinite(
+                        camera.offsetY
+                    )
+                ) {
+
+                    camera.offsetY +=
+                        dy;
+
+                }
 
             }
 
 
-            if (
-                Number.isFinite(
-                    camera.y
-                )
-            ) {
-
-                camera.y +=
-                    dy;
-
-            }
-
-
-            if (
-                Number.isFinite(
-                    camera.offsetX
-                )
-            ) {
-
-                camera.offsetX +=
-                    dx;
-
-            }
-
-
-            if (
-                Number.isFinite(
-                    camera.offsetY
-                )
-            ) {
-
-                camera.offsetY +=
-                    dy;
-
-            }
+            render();
 
         }
 
@@ -1684,11 +2478,9 @@ window.addEventListener(
         lastMouseX =
             event.clientX;
 
+
         lastMouseY =
             event.clientY;
-
-
-        render();
 
     }
 
@@ -1705,7 +2497,8 @@ window.addEventListener(
 
     () => {
 
-        isDragging = false;
+        isDragging =
+            false;
 
     }
 
@@ -1723,12 +2516,13 @@ canvas.addEventListener(
     event => {
 
         // ----------------------------------------------------
-        // 刚刚拖动过地图
+        // 如果刚才是拖动，不执行点击
         // ----------------------------------------------------
 
         if (dragMoved) {
 
-            dragMoved = false;
+            dragMoved =
+                false;
 
             return;
 
@@ -1736,7 +2530,7 @@ canvas.addEventListener(
 
 
         // ----------------------------------------------------
-        // 点击单位
+        // 第一优先级：点击单位
         // ----------------------------------------------------
 
         const clickedUnit =
@@ -1759,14 +2553,14 @@ canvas.addEventListener(
 
             }
 
+
             return;
 
         }
 
 
         // ----------------------------------------------------
-        // 已选择单位
-        // 尝试移动
+        // 第二优先级：移动
         // ----------------------------------------------------
 
         if (selectedUnit) {
@@ -1806,6 +2600,27 @@ canvas.addEventListener(
 
 
 // ============================================================
+// 右键取消选择
+// ============================================================
+
+canvas.addEventListener(
+
+    "contextmenu",
+
+    event => {
+
+        event.preventDefault();
+
+        clearSelection();
+
+        render();
+
+    }
+
+);
+
+
+// ============================================================
 // 滚轮缩放
 // ============================================================
 
@@ -1818,22 +2633,16 @@ canvas.addEventListener(
         event.preventDefault();
 
 
-        const rect =
-            canvas.getBoundingClientRect();
-
-
-        const mouseX =
-            event.clientX -
-            rect.left;
-
-
-        const mouseY =
-            event.clientY -
-            rect.top;
+        const mouse =
+            getCanvasMousePosition(
+                event
+            );
 
 
         const oldZoom =
-            camera.zoom ?? 1;
+            Number(
+                camera.zoom ?? 1
+            );
 
 
         const factor =
@@ -1845,13 +2654,17 @@ canvas.addEventListener(
 
 
         const minZoom =
-            camera.minZoom ??
-            0.35;
+            Number(
+                camera.minZoom ??
+                0.35
+            );
 
 
         const maxZoom =
-            camera.maxZoom ??
-            3;
+            Number(
+                camera.maxZoom ??
+                3
+            );
 
 
         const newZoom =
@@ -1872,7 +2685,7 @@ canvas.addEventListener(
 
 
         // ----------------------------------------------------
-        // Camera 自带 zoomAt
+        // Camera 原生缩放
         // ----------------------------------------------------
 
         if (
@@ -1880,20 +2693,33 @@ canvas.addEventListener(
             "function"
         ) {
 
-            camera.zoomAt(
+            try {
 
-                mouseX,
+                camera.zoomAt(
 
-                mouseY,
+                    mouse.x,
 
-                newZoom
+                    mouse.y,
 
-            );
+                    newZoom
+
+                );
 
 
-            render();
+                render();
 
-            return;
+                return;
+
+            }
+
+            catch (error) {
+
+                console.warn(
+                    "camera.zoomAt() 调用失败，改用本地缩放：",
+                    error
+                );
+
+            }
 
         }
 
@@ -1903,47 +2729,49 @@ canvas.addEventListener(
         // ----------------------------------------------------
 
         const oldX =
+            Number(
 
-            camera.x ??
-            camera.offsetX ??
-            0;
+                camera.x ??
+                camera.offsetX ??
+                0
+
+            );
 
 
         const oldY =
+            Number(
 
-            camera.y ??
-            camera.offsetY ??
-            0;
+                camera.y ??
+                camera.offsetY ??
+                0
+
+            );
 
 
         const worldX =
-
             (
-                mouseX -
+                mouse.x -
                 oldX
             ) /
             oldZoom;
 
 
         const worldY =
-
             (
-                mouseY -
+                mouse.y -
                 oldY
             ) /
             oldZoom;
 
 
         const newX =
-
-            mouseX -
+            mouse.x -
             worldX *
             newZoom;
 
 
         const newY =
-
-            mouseY -
+            mouse.y -
             worldY *
             newZoom;
 
@@ -2028,6 +2856,44 @@ function endCurrentPhase() {
 
     }
 
+    else {
+
+        /*
+         * TurnSystem 没有 endPhase 时的后备方案。
+         */
+
+        const current =
+            getCurrentPhase();
+
+
+        turnSystem.phase =
+
+            current === "german"
+
+                ? "soviet"
+
+                : "german";
+
+
+        if (
+            current === "soviet"
+        ) {
+
+            if (
+                Number.isFinite(
+                    turnSystem.turn
+                )
+            ) {
+
+                turnSystem.turn +=
+                    1;
+
+            }
+
+        }
+
+    }
+
 
     updateTurnUI();
 
@@ -2037,20 +2903,24 @@ function endCurrentPhase() {
 
 
 // ============================================================
-// 按钮
+// 结束阶段按钮
 // ============================================================
 
-endPhaseButton?.addEventListener(
+if (endPhaseButton) {
 
-    "click",
+    endPhaseButton.addEventListener(
 
-    () => {
+        "click",
 
-        endCurrentPhase();
+        () => {
 
-    }
+            endCurrentPhase();
 
-);
+        }
+
+    );
+
+}
 
 
 // ============================================================
@@ -2063,8 +2933,9 @@ window.addEventListener(
 
     event => {
 
-
+        // ----------------------------------------------------
         // ESC
+        // ----------------------------------------------------
 
         if (
             event.key ===
@@ -2080,7 +2951,9 @@ window.addEventListener(
         }
 
 
+        // ----------------------------------------------------
         // E
+        // ----------------------------------------------------
 
         if (
             event.key.toLowerCase() ===
@@ -2100,7 +2973,15 @@ window.addEventListener(
 // 玩家选择阵营之后
 // ============================================================
 
-function startGame() {
+function startGame(
+    selectedFaction = null
+) {
+
+    console.log(
+        "选择阵营：",
+        selectedFaction
+    );
+
 
     console.log(
         "玩家阵营：",
@@ -2126,6 +3007,86 @@ function startGame() {
 
 
 // ============================================================
+// 从 Scenario 提取单位
+// ============================================================
+
+function extractUnitsFromScenario(
+    data
+) {
+
+    if (!data) {
+
+        return [];
+
+    }
+
+
+    // --------------------------------------------------------
+    // scenario.units
+    // --------------------------------------------------------
+
+    if (
+        Array.isArray(
+            data.units
+        )
+    ) {
+
+        return data.units;
+
+    }
+
+
+    // --------------------------------------------------------
+    // scenario 本身就是数组
+    // --------------------------------------------------------
+
+    if (
+        Array.isArray(
+            data
+        )
+    ) {
+
+        return data;
+
+    }
+
+
+    // --------------------------------------------------------
+    // 德军
+    // --------------------------------------------------------
+
+    const germanUnits =
+
+        data.german?.units ??
+        data.axis?.units ??
+        data.GER?.units ??
+        [];
+
+
+    // --------------------------------------------------------
+    // 苏军
+    // --------------------------------------------------------
+
+    const sovietUnits =
+
+        data.soviet?.units ??
+        data.ussr?.units ??
+        data.USSR?.units ??
+        [];
+
+
+    return [
+
+        ...germanUnits,
+
+        ...sovietUnits
+
+    ];
+
+}
+
+
+// ============================================================
 // 加载场景
 // ============================================================
 
@@ -2133,9 +3094,9 @@ async function loadScenario() {
 
     try {
 
-        // ====================================================
-        // 读取 scenario
-        // ====================================================
+        // ----------------------------------------------------
+        // Scenario
+        // ----------------------------------------------------
 
         const response =
             await fetch(
@@ -2158,57 +3119,14 @@ async function loadScenario() {
             await response.json();
 
 
-        // ====================================================
-        // 读取单位
-        // ====================================================
+        // ----------------------------------------------------
+        // 单位
+        // ----------------------------------------------------
 
-        if (
-            Array.isArray(
-                scenario.units
-            )
-        ) {
-
-            units =
-                scenario.units;
-
-        }
-
-        else if (
-            Array.isArray(
+        units =
+            extractUnitsFromScenario(
                 scenario
-            )
-        ) {
-
-            units =
-                scenario;
-
-        }
-
-        else {
-
-            const germanUnits =
-
-                scenario.german?.units ??
-                scenario.axis?.units ??
-                [];
-
-
-            const sovietUnits =
-
-                scenario.soviet?.units ??
-                scenario.ussr?.units ??
-                [];
-
-
-            units = [
-
-                ...germanUnits,
-
-                ...sovietUnits
-
-            ];
-
-        }
+            );
 
 
         console.log(
@@ -2222,39 +3140,40 @@ async function loadScenario() {
         );
 
 
-        // ====================================================
+        // ----------------------------------------------------
         // 初始化单位
-        // ====================================================
+        // ----------------------------------------------------
 
         initializeUnits();
 
 
-        // ====================================================
+        // ----------------------------------------------------
         // 初始化回合
-        // ====================================================
+        // ----------------------------------------------------
 
         initializeTurnSystem();
 
 
-        // ====================================================
+        // ----------------------------------------------------
         // Canvas
-        // ====================================================
+        // ----------------------------------------------------
 
         resizeCanvas();
 
 
-        // ====================================================
-        // 第一次渲染
-        // ====================================================
+        // ----------------------------------------------------
+        // 初始渲染
+        // ----------------------------------------------------
 
         render();
 
 
-        // ====================================================
+        // ----------------------------------------------------
         // 阵营选择
         //
-        // 这里就是之前 onStart 报错的核心修复
-        // ====================================================
+        // 必须传 startGame
+        // 防止之前的 onStart is not a function
+        // ----------------------------------------------------
 
         if (
             typeof factionSelection.show ===
@@ -2269,16 +3188,13 @@ async function loadScenario() {
 
         else {
 
-            // 如果没有阵营选择界面
-            // 直接启动
-
             startGame();
 
         }
 
 
         console.log(
-            "东线 1941 V0.5 已启动"
+            "东线 1941 V0.6 已启动"
         );
 
 
@@ -2289,11 +3205,8 @@ async function loadScenario() {
         ) {
 
             console.log(
-
                 "回合状态：",
-
                 turnSystem.getState()
-
             );
 
         }
@@ -2303,11 +3216,8 @@ async function loadScenario() {
     catch (error) {
 
         console.error(
-
             "游戏初始化失败：",
-
             error
-
         );
 
 
@@ -2333,7 +3243,7 @@ async function loadScenario() {
 
 
 // ============================================================
-// 窗口变化
+// 窗口大小变化
 // ============================================================
 
 window.addEventListener(
@@ -2349,6 +3259,61 @@ window.addEventListener(
     }
 
 );
+
+
+// ============================================================
+// 调试接口
+//
+// 在浏览器 Console 可以输入：
+//
+// dubno.units
+// dubno.selectedUnit
+// dubno.camera
+//
+// 方便后续开发。
+// ============================================================
+
+window.dubno = {
+
+    get units() {
+
+        return units;
+
+    },
+
+
+    get selectedUnit() {
+
+        return selectedUnit;
+
+    },
+
+
+    get turnSystem() {
+
+        return turnSystem;
+
+    },
+
+
+    camera,
+
+    renderer,
+
+    selection,
+
+    movementSystem,
+
+    gameState,
+
+
+    selectUnit,
+
+    clearSelection,
+
+    render
+
+};
 
 
 // ============================================================
