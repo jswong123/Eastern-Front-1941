@@ -1,67 +1,140 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
     <title>东线 1941：杜布诺</title>
 
-    <link rel="stylesheet" href="./style.css">
+    <link
+        rel="stylesheet"
+        href="./style.css"
+    >
 </head>
+
 
 <body>
 
 <div id="game">
 
+    <!-- ============================= -->
+    <!-- 顶部状态栏 -->
+    <!-- ============================= -->
+
     <header id="topbar">
+
         <div>
             <strong>东线 1941</strong>
-            <span class="subtitle">杜布诺战役 · V0.1</span>
+
+            <span class="subtitle">
+                杜布诺战役 · V0.4
+            </span>
         </div>
+
 
         <div id="turnInfo">
             1941年6月26日 · 08:00
         </div>
+
     </header>
 
 
+    <!-- ============================= -->
+    <!-- 游戏主体 -->
+    <!-- ============================= -->
+
     <main id="main">
 
+
+        <!-- 地图区域 -->
+
         <section id="mapArea">
-            <canvas id="game-canvas"></canvas> id="gameCanvas"></canvas>
+
+            <canvas id="game-canvas"></canvas>
+
         </section>
 
 
+        <!-- ========================= -->
+        <!-- 右侧作战信息 -->
+        <!-- ========================= -->
+
         <aside id="sidebar">
 
-            <h2>作战信息</h2>
+            <div id="info-panel">
 
-            <div id="unitInfo">
-                点击地图上的单位查看详情
+                <h2>
+                    作战信息
+                </h2>
+
+
+                <p class="hint">
+                    点击地图上的单位查看详情
+                </p>
+
+
+                <hr>
+
+
+                <h3>
+                    地图操作
+                </h3>
+
+
+                <p>
+                    鼠标拖动：移动地图
+                </p>
+
+                <p>
+                    滚轮：缩放
+                </p>
+
+                <p>
+                    点击单位：选择
+                </p>
+
+
+                <hr>
+
+
+                <h3>
+                    图例
+                </h3>
+
+
+                <p>
+                    德军：蓝灰色
+                </p>
+
+                <p>
+                    苏军：红色
+                </p>
+
             </div>
 
-            <hr>
-
-            <h3>地图操作</h3>
-
-            <p>鼠标拖动：移动地图</p>
-            <p>滚轮：缩放</p>
-            <p>点击单位：选择</p>
-
-            <hr>
-
-            <h3>图例</h3>
-
-            <p>德军：蓝灰色</p>
-            <p>苏军：红色</p>
-
         </aside>
+
 
     </main>
 
 </div>
 
-<script type="module" src="./src/main.js"></script>
+
+<!-- ============================= -->
+<!-- 游戏入口 -->
+<!-- ============================= -->
+
+<script
+    type="module"
+    src="./src/main.js">
+</script>
+
 
 </body>
+
 </html>
