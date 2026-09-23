@@ -2,20 +2,21 @@ export class UnitSelection {
 
     constructor(
         renderer,
-        infoElement
+        infoElement,
+        gameState
     ) {
 
-        this.renderer =
-            renderer;
+        this.renderer = renderer;
+        this.infoElement = infoElement;
+        this.gameState = gameState;
 
-        this.infoElement =
-            infoElement;
-
-        this.selectedUnit =
-            null;
-
+        this.selectedUnit = null;
     }
 
+
+    // ========================================
+    // 点击检测
+    // ========================================
 
     findUnitAt(
         mouseX,
@@ -25,8 +26,8 @@ export class UnitSelection {
 
         /*
          * 从最后绘制的单位开始检测。
-         * 如果以后两个单位图标重叠，
-         * 优先选择最上面的那个。
+         * 如果单位发生重叠，
+         * 优先选择最上层单位。
          */
 
         for (
@@ -35,8 +36,7 @@ export class UnitSelection {
             i--
         ) {
 
-            const unit =
-                units[i];
+            const unit = units[i];
 
             const position =
                 this.renderer.worldToScreen(
@@ -46,12 +46,10 @@ export class UnitSelection {
 
 
             const dx =
-                mouseX -
-                position.x;
+                mouseX - position.x;
 
             const dy =
-                mouseY -
-                position.y;
+                mouseY - position.y;
 
 
             const distance =
@@ -61,11 +59,20 @@ export class UnitSelection {
                 );
 
 
+            /*
+             * 点击判定范围。
+             *
+             * 不让点击范围随着缩放无限增大。
+             */
+
             const radius =
-                32 *
+                34 *
                 Math.max(
                     0.75,
-                    this.renderer.camera.zoom
+                    Math.min(
+                        1.35,
+                        this.renderer.camera.zoom
+                    )
                 );
 
 
@@ -84,10 +91,13 @@ export class UnitSelection {
     }
 
 
+    // ========================================
+    // 选择单位
+    // ========================================
+
     select(unit) {
 
-        this.selectedUnit =
-            unit;
+        this.selectedUnit = unit;
 
 
         if (!unit) {
@@ -95,31 +105,136 @@ export class UnitSelection {
             this.showEmpty();
 
             return;
+        }
+
+
+        /*
+         * 观察员模式：
+         * 双方资料全部可见。
+         */
+
+        if (
+            this.gameState.isObserver()
+        ) {
+
+            this.showUnit(unit);
+
+            return;
+        }
+
+
+        /*
+         * 己方单位：
+         * 完整资料。
+         */
+
+        if (
+            this.gameState.isPlayerUnit(unit)
+        ) {
+
+            this.showUnit(unit);
+
+            return;
+        }
+
+
+        /*
+         * 敌方单位：
+         * 暂时显示有限情报。
+         *
+         * V0.5 后由真正的
+         * IntelligenceSystem 接管。
+         */
+
+        this.showEnemyUnit(unit);
+    }
+
+
+    // ========================================
+    // 空白面板
+    // ========================================
+
+    showEmpty() {
+
+        if (!this.infoElement) {
+            return;
+        }
+
+
+        let factionText = "";
+
+
+        if (
+            this.gameState &&
+            this.gameState.isObserver()
+        ) {
+
+            factionText = `
+                <p style="
+                    margin-top:10px;
+                    opacity:0.65;
+                ">
+                    当前模式：观察员
+                </p>
+            `;
+
+        }
+
+        else if (
+            this.gameState &&
+            this.gameState.playerFaction
+        ) {
+
+            const faction =
+                this.gameState.factions[
+                    this.gameState.playerFaction
+                ];
+
+
+            factionText = `
+                <p style="
+                    margin-top:10px;
+                    opacity:0.65;
+                ">
+                    当前阵营：
+                    ${faction?.name ?? ""}
+                </p>
+            `;
 
         }
 
 
-        this.showUnit(
-            unit
-        );
-
-    }
-
-
-    showEmpty() {
-
         this.infoElement.innerHTML = `
-            点击地图上的单位查看详情
-        `;
 
+            <div>
+                点击地图上的单位查看详情
+            </div>
+
+            ${factionText}
+
+        `;
     }
 
+
+    // ========================================
+    // 阵营名称
+    // ========================================
 
     getFactionName(unit) {
 
+        const faction =
+            unit.faction ??
+            (
+                unit.side === "germany"
+                    ? "GER"
+                    : unit.side === "soviet"
+                        ? "USSR"
+                        : null
+            );
+
+
         if (
-            unit.faction === "GER" ||
-            unit.side === "germany"
+            faction === "GER"
         ) {
 
             return "德军";
@@ -128,8 +243,7 @@ export class UnitSelection {
 
 
         if (
-            unit.faction === "USSR" ||
-            unit.side === "soviet"
+            faction === "USSR"
         ) {
 
             return "苏军";
@@ -138,9 +252,12 @@ export class UnitSelection {
 
 
         return "未知";
-
     }
 
+
+    // ========================================
+    // 兵种名称
+    // ========================================
 
     getTypeName(type) {
 
@@ -148,15 +265,21 @@ export class UnitSelection {
 
             infantry: "步兵",
 
+            motorized: "摩托化步兵",
+
             armor: "装甲兵",
 
             artillery: "炮兵",
 
             antitank: "反坦克兵",
 
+            antiair: "防空兵",
+
             engineer: "工兵",
 
             reconnaissance: "侦察兵",
+
+            cavalry: "骑兵",
 
             headquarters: "指挥单位"
 
@@ -168,19 +291,32 @@ export class UnitSelection {
             type ??
             "未知"
         );
-
     }
 
+
+    // ========================================
+    // 单位规模
+    // ========================================
 
     getLevelName(level) {
 
         const names = {
 
+            squad: "班",
+
             platoon: "排",
 
             company: "连",
 
-            battalion: "营"
+            battalion: "营",
+
+            regiment: "团",
+
+            brigade: "旅",
+
+            division: "师",
+
+            corps: "军"
 
         };
 
@@ -190,16 +326,22 @@ export class UnitSelection {
             level ??
             "未知"
         );
-
     }
 
 
+    // ========================================
+    // 己方 / 观察员完整资料
+    // ========================================
+
     showUnit(unit) {
 
+        if (!this.infoElement) {
+            return;
+        }
+
+
         const faction =
-            this.getFactionName(
-                unit
-            );
+            this.getFactionName(unit);
 
 
         const type =
@@ -214,13 +356,12 @@ export class UnitSelection {
             );
 
 
-        /*
-         * 装甲/火炮单位显示装备数量；
-         * 步兵显示实际人员。
-         */
-
         let strengthHTML = "";
 
+
+        /*
+         * 车辆/火炮单位
+         */
 
         if (
             unit.operational !== undefined
@@ -235,6 +376,7 @@ export class UnitSelection {
                     </strong>
                 </div>
 
+
                 <div class="unit-row">
                     <span>可战斗</span>
                     <strong>
@@ -244,12 +386,14 @@ export class UnitSelection {
                     </strong>
                 </div>
 
+
                 <div class="unit-row">
                     <span>受损</span>
                     <strong>
                         ${unit.damaged ?? 0}
                     </strong>
                 </div>
+
 
                 <div class="unit-row">
                     <span>被毁</span>
@@ -260,7 +404,13 @@ export class UnitSelection {
 
             `;
 
-        } else {
+        }
+
+        /*
+         * 步兵单位
+         */
+
+        else {
 
             strengthHTML = `
 
@@ -281,32 +431,50 @@ export class UnitSelection {
         this.infoElement.innerHTML = `
 
             <div class="unit-title">
-                ${unit.name ?? unit.shortName ?? "未命名单位"}
+                ${unit.name ??
+                  unit.shortName ??
+                  "未命名单位"}
             </div>
 
 
             <div class="unit-row">
                 <span>阵营</span>
-                <strong>${faction}</strong>
+                <strong>
+                    ${faction}
+                </strong>
             </div>
 
 
             <div class="unit-row">
                 <span>兵种</span>
-                <strong>${type}</strong>
+                <strong>
+                    ${type}
+                </strong>
             </div>
 
 
             <div class="unit-row">
                 <span>规模</span>
-                <strong>${level}</strong>
+                <strong>
+                    ${level}
+                </strong>
             </div>
 
 
             <hr>
 
 
-            <h3>编制</h3>
+            <h3>
+                编制
+            </h3>
+
+
+            <div class="unit-row">
+                <span>军</span>
+                <strong>
+                    ${unit.corps ?? "—"}
+                </strong>
+            </div>
 
 
             <div class="unit-row">
@@ -320,9 +488,11 @@ export class UnitSelection {
             <div class="unit-row">
                 <span>团</span>
                 <strong>
-                    ${unit.regimentName ??
-                      unit.regiment ??
-                      "—"}
+                    ${
+                        unit.regimentName ??
+                        unit.regiment ??
+                        "—"
+                    }
                 </strong>
             </div>
 
@@ -338,7 +508,11 @@ export class UnitSelection {
             <div class="unit-row">
                 <span>单位</span>
                 <strong>
-                    ${unit.shortName ?? "—"}
+                    ${
+                        unit.shortName ??
+                        unit.name ??
+                        "—"
+                    }
                 </strong>
             </div>
 
@@ -346,7 +520,10 @@ export class UnitSelection {
             <hr>
 
 
-            <h3>战斗实力</h3>
+            <h3>
+                战斗实力
+            </h3>
+
 
             ${strengthHTML}
 
@@ -354,7 +531,9 @@ export class UnitSelection {
             <hr>
 
 
-            <h3>状态</h3>
+            <h3>
+                状态
+            </h3>
 
 
             <div class="unit-row">
@@ -393,8 +572,8 @@ export class UnitSelection {
                 <span>燃油</span>
                 <strong>
                     ${
-                        unit.type === "armor"
-                            ? `${unit.fuel ?? 100}%`
+                        unit.fuel !== undefined
+                            ? `${unit.fuel}%`
                             : "—"
                     }
                 </strong>
@@ -412,7 +591,144 @@ export class UnitSelection {
             </div>
 
         `;
-
     }
 
+
+    // ========================================
+    // 敌军有限情报
+    // ========================================
+
+    showEnemyUnit(unit) {
+
+        if (!this.infoElement) {
+            return;
+        }
+
+
+        const faction =
+            this.getFactionName(unit);
+
+
+        const type =
+            this.getTypeName(
+                unit.type
+            );
+
+
+        const level =
+            this.getLevelName(
+                unit.level
+            );
+
+
+        this.infoElement.innerHTML = `
+
+            <div class="unit-title">
+                敌军单位
+            </div>
+
+
+            <div class="unit-row">
+                <span>阵营</span>
+                <strong>
+                    ${faction}
+                </strong>
+            </div>
+
+
+            <div class="unit-row">
+                <span>判断兵种</span>
+                <strong>
+                    ${type}
+                </strong>
+            </div>
+
+
+            <div class="unit-row">
+                <span>估计规模</span>
+                <strong>
+                    ${level}
+                </strong>
+            </div>
+
+
+            <hr>
+
+
+            <h3>
+                情报
+            </h3>
+
+
+            <div class="unit-row">
+                <span>番号</span>
+                <strong>
+                    未确认
+                </strong>
+            </div>
+
+
+            <div class="unit-row">
+                <span>兵力</span>
+                <strong>
+                    未知
+                </strong>
+            </div>
+
+
+            <div class="unit-row">
+                <span>装备</span>
+                <strong>
+                    未确认
+                </strong>
+            </div>
+
+
+            <div class="unit-row">
+                <span>士气</span>
+                <strong>
+                    未知
+                </strong>
+            </div>
+
+
+            <div class="unit-row">
+                <span>弹药</span>
+                <strong>
+                    未知
+                </strong>
+            </div>
+
+
+            <div class="unit-row">
+                <span>燃油</span>
+                <strong>
+                    未知
+                </strong>
+            </div>
+
+
+            <hr>
+
+
+            <div class="unit-row">
+                <span>情报可信度</span>
+                <strong>
+                    低
+                </strong>
+            </div>
+
+
+            <div style="
+                margin-top:18px;
+                opacity:0.65;
+                line-height:1.7;
+            ">
+                当前仅确认敌军的大致兵种与规模。
+                后续需要通过侦察、战斗接触、
+                无线电情报等方式进一步识别。
+            </div>
+
+        `;
+    }
 }
