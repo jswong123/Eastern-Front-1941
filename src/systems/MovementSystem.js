@@ -4,7 +4,6 @@
 // 单位移动规则
 // ========================================
 
-
 import {
     Pathfinding
 } from "./Pathfinding.js";
@@ -14,23 +13,15 @@ export class MovementSystem {
 
     constructor(world) {
 
-        this.world =
-            world;
-
+        this.world = world;
 
         this.pathfinding =
-            new Pathfinding(
-                world
-            );
+            new Pathfinding(world);
 
-
-        this.selectedUnit =
-            null;
-
+        this.selectedUnit = null;
 
         this.reachable =
             new Map();
-
 
         this.previous =
             new Map();
@@ -69,9 +60,15 @@ export class MovementSystem {
         };
 
 
+        const type =
+            String(
+                unit?.type ?? ""
+            ).toLowerCase();
+
+
         return (
-            unit.movement ??
-            values[unit.type] ??
+            unit?.movement ??
+            values[type] ??
             4
         );
 
@@ -83,6 +80,11 @@ export class MovementSystem {
     // ========================================
 
     initializeUnit(unit) {
+
+        if (!unit) {
+            return;
+        }
+
 
         if (
             unit.maxMovementPoints ===
@@ -107,6 +109,17 @@ export class MovementSystem {
 
         }
 
+
+        /*
+         * 防止行动点异常超过最大值
+         */
+
+        unit.movementPoints =
+            Math.min(
+                unit.movementPoints,
+                unit.maxMovementPoints
+            );
+
     }
 
 
@@ -116,7 +129,7 @@ export class MovementSystem {
 
     selectUnit(
         unit,
-        units
+        units = []
     ) {
 
         this.clear();
@@ -136,6 +149,20 @@ export class MovementSystem {
             unit;
 
 
+        /*
+         * 已经没有行动点时，
+         * 不再计算移动范围。
+         */
+
+        if (
+            unit.movementPoints <= 0
+        ) {
+
+            return;
+
+        }
+
+
         const result =
             this.pathfinding
                 .getReachableHexes(
@@ -150,11 +177,13 @@ export class MovementSystem {
 
 
         this.reachable =
-            result.costs;
+            result?.costs ??
+            new Map();
 
 
         this.previous =
-            result.previous;
+            result?.previous ??
+            new Map();
 
     }
 
@@ -194,7 +223,11 @@ export class MovementSystem {
     // 执行移动
     // ========================================
 
-    moveTo(q, r) {
+    moveTo(
+        q,
+        r,
+        units = []
+    ) {
 
         if (
             !this.selectedUnit
@@ -221,11 +254,45 @@ export class MovementSystem {
             this.selectedUnit;
 
 
+        this.initializeUnit(
+            unit
+        );
+
+
         const cost =
             this.getMoveCost(
                 q,
                 r
             );
+
+
+        /*
+         * 无法确定移动成本时
+         * 不允许移动。
+         */
+
+        if (
+            cost === null ||
+            cost === undefined
+        ) {
+
+            return null;
+
+        }
+
+
+        /*
+         * 防止行动点不足。
+         */
+
+        if (
+            cost >
+            unit.movementPoints
+        ) {
+
+            return null;
+
+        }
 
 
         const path =
@@ -244,6 +311,7 @@ export class MovementSystem {
 
 
         if (
+            !path ||
             path.length === 0
         ) {
 
@@ -261,23 +329,27 @@ export class MovementSystem {
         };
 
 
-        /*
-         * V0.4A：
-         * 暂时直接移动到终点。
-         *
-         * V0.4A.1 可以增加沿路径动画。
-         */
+        // ========================================
+        // 移动单位
+        // ========================================
 
         unit.q = q;
 
         unit.r = r;
 
 
+        // ========================================
+        // 扣除行动点
+        // ========================================
+
         unit.movementPoints =
             Math.max(
+
                 0,
+
                 unit.movementPoints -
                 cost
+
             );
 
 
@@ -288,26 +360,57 @@ export class MovementSystem {
             from,
 
             to: {
+
                 q,
+
                 r
+
             },
 
             cost,
 
-            path
+            path,
+
+            remainingMovementPoints:
+                unit.movementPoints
 
         };
 
 
-        /*
-         * 移动之后重新计算
-         * 剩余移动范围。
-         */
+        // ========================================
+        // 根据剩余行动点
+        // 重新计算移动范围
+        // ========================================
 
-        this.selectUnit(
-            unit,
-            []
-        );
+        if (
+            unit.movementPoints > 0
+        ) {
+
+            this.selectUnit(
+                unit,
+                units
+            );
+
+        }
+
+        else {
+
+            /*
+             * 行动力耗尽后仍保留
+             * selectedUnit，
+             * 但清空移动范围。
+             */
+
+            this.reachable =
+                new Map();
+
+            this.previous =
+                new Map();
+
+            this.selectedUnit =
+                unit;
+
+        }
 
 
         return result;
@@ -324,10 +427,8 @@ export class MovementSystem {
         this.selectedUnit =
             null;
 
-
         this.reachable =
             new Map();
-
 
         this.previous =
             new Map();
@@ -336,10 +437,15 @@ export class MovementSystem {
 
 
     // ========================================
-    // 新回合恢复移动点
+    // 新行动阶段恢复单个单位行动点
     // ========================================
 
     resetUnit(unit) {
+
+        if (!unit) {
+            return;
+        }
+
 
         this.initializeUnit(
             unit
@@ -352,10 +458,23 @@ export class MovementSystem {
     }
 
 
+    // ========================================
+    // 新行动阶段恢复整个阵营行动点
+    // ========================================
+
     resetFaction(
         units,
         faction
     ) {
+
+        if (
+            !Array.isArray(units)
+        ) {
+
+            return;
+
+        }
+
 
         for (
             const unit
