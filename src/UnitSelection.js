@@ -1,10 +1,17 @@
 // ============================================================
 // UnitSelection.js
+// 东线 1941
 //
-// 单位选择与右侧作战信息面板
-// V0.4A
+// 单位选择系统
+// V0.6
+//
+// 功能：
+// - 单位点击命中
+// - 单位选择
+// - 单位取消选择
+// - 右侧单位信息
+// - 兼容 Canvas DPR
 // ============================================================
-
 
 export class UnitSelection {
 
@@ -16,24 +23,22 @@ export class UnitSelection {
         this.renderer =
             renderer;
 
-
         this.gameState =
             gameState;
-
 
         this.selectedUnit =
             null;
 
 
+        // ----------------------------------------------------
+        // 信息面板
+        // ----------------------------------------------------
+
         this.infoPanel =
             document.getElementById(
-                "info-panel"
+                "unitInfo"
             );
 
-
-        /*
-         * 兼容可能使用的其他 ID
-         */
 
         if (!this.infoPanel) {
 
@@ -45,14 +50,268 @@ export class UnitSelection {
         }
 
 
-        this.renderer.selection =
-            this;
+        if (!this.infoPanel) {
+
+            this.infoPanel =
+                document.getElementById(
+                    "info-panel"
+                );
+
+        }
+
+
+        // ----------------------------------------------------
+        // 连接 Renderer
+        // ----------------------------------------------------
+
+        if (this.renderer) {
+
+            this.renderer.selection =
+                this;
+
+        }
 
     }
 
 
     // ========================================================
-    // 查找鼠标点击位置的单位
+    // 阵营标准化
+    // ========================================================
+
+    normalizeSide(side) {
+
+        const value =
+            String(
+                side ?? ""
+            )
+                .trim()
+                .toLowerCase();
+
+
+        if (
+            value === "ger" ||
+            value === "german" ||
+            value === "germany" ||
+            value === "axis" ||
+            value === "de" ||
+            value === "德军"
+        ) {
+
+            return "german";
+
+        }
+
+
+        if (
+            value === "ussr" ||
+            value === "soviet" ||
+            value === "redarmy" ||
+            value === "red_army" ||
+            value === "su" ||
+            value === "苏军" ||
+            value === "红军"
+        ) {
+
+            return "soviet";
+
+        }
+
+
+        return value;
+
+    }
+
+
+    // ========================================================
+    // 获取单位阵营
+    // ========================================================
+
+    getUnitSide(unit) {
+
+        if (!unit) {
+
+            return "";
+
+        }
+
+
+        return this.normalizeSide(
+
+            unit.side ??
+            unit.faction ??
+            unit.camp ??
+            unit.nation
+
+        );
+
+    }
+
+
+    // ========================================================
+    // 获取玩家阵营
+    // ========================================================
+
+    getPlayerSide() {
+
+        if (!this.gameState) {
+
+            return "";
+
+        }
+
+
+        return this.normalizeSide(
+
+            this.gameState.playerFaction ??
+            this.gameState.playerSide ??
+            this.gameState.side ??
+            this.gameState.faction
+
+        );
+
+    }
+
+
+    // ========================================================
+    // 是否观察员
+    // ========================================================
+
+    isObserver() {
+
+        if (!this.gameState) {
+
+            return false;
+
+        }
+
+
+        return (
+
+            this.gameState.mode ===
+                "observer"
+
+            ||
+
+            this.gameState.observerMode ===
+                true
+
+        );
+
+    }
+
+
+    // ========================================================
+    // Hex -> 屏幕位置
+    // ========================================================
+
+    getUnitScreenPosition(unit) {
+
+        if (
+            !unit ||
+            !this.renderer
+        ) {
+
+            return null;
+
+        }
+
+
+        // ----------------------------------------------------
+        // Renderer 标准接口
+        // ----------------------------------------------------
+
+        if (
+            typeof this.renderer
+                .worldToScreen ===
+            "function"
+        ) {
+
+            const p =
+                this.renderer
+                    .worldToScreen(
+                        unit.q,
+                        unit.r
+                    );
+
+
+            if (
+                p &&
+                Number.isFinite(p.x) &&
+                Number.isFinite(p.y)
+            ) {
+
+                return p;
+
+            }
+
+        }
+
+
+        // ----------------------------------------------------
+        // 后备方案
+        // ----------------------------------------------------
+
+        if (
+            typeof this.renderer
+                .hexToWorld ===
+            "function"
+        ) {
+
+            const world =
+                this.renderer
+                    .hexToWorld(
+                        unit.q,
+                        unit.r
+                    );
+
+
+            if (!world) {
+
+                return null;
+
+            }
+
+
+            const camera =
+                this.renderer.camera;
+
+
+            const zoom =
+                camera?.zoom ?? 1;
+
+
+            const cameraX =
+                camera?.x ?? 0;
+
+
+            const cameraY =
+                camera?.y ?? 0;
+
+
+            return {
+
+                x:
+                    world.x *
+                    zoom +
+                    cameraX,
+
+                y:
+                    world.y *
+                    zoom +
+                    cameraY
+
+            };
+
+        }
+
+
+        return null;
+
+    }
+
+
+    // ========================================================
+    // 查找点击位置单位
     // ========================================================
 
     findUnitAt(
@@ -61,11 +320,111 @@ export class UnitSelection {
         units
     ) {
 
+        if (
+            !Array.isArray(units) ||
+            !this.renderer
+        ) {
+
+            return null;
+
+        }
+
+
+        const canvas =
+            this.renderer.canvas;
+
+
+        if (!canvas) {
+
+            return null;
+
+        }
+
+
+        const rect =
+            canvas.getBoundingClientRect();
+
+
+        // ----------------------------------------------------
+        // Canvas 内部分辨率 / CSS 分辨率
+        // ----------------------------------------------------
+        //
+        // 例如：
+        //
+        // CSS width = 1300
+        // canvas.width = 2600
+        //
+        // scaleX = 2
+        //
+        // Renderer 的实际绘图坐标可能位于 Canvas 像素空间。
+        // 鼠标事件却位于 CSS 像素空间。
+        //
+        // 因此同时支持两套坐标。
+        // ----------------------------------------------------
+
+        const scaleX =
+
+            rect.width > 0
+
+                ? canvas.width /
+                    rect.width
+
+                : 1;
+
+
+        const scaleY =
+
+            rect.height > 0
+
+                ? canvas.height /
+                    rect.height
+
+                : 1;
+
+
+        const mouseCanvasX =
+            mouseX * scaleX;
+
+
+        const mouseCanvasY =
+            mouseY * scaleY;
+
+
+        const zoom =
+            this.renderer.camera?.zoom ??
+            1;
+
+
+        // ----------------------------------------------------
+        // 点击区域
+        // ----------------------------------------------------
+
+        const baseWidth =
+            56;
+
+
+        const baseHeight =
+            46;
+
+
+        const width =
+            Math.max(
+                32,
+                baseWidth * zoom
+            );
+
+
+        const height =
+            Math.max(
+                28,
+                baseHeight * zoom
+            );
+
+
         /*
-         * 倒序检查。
+         * 倒序查找。
          *
-         * 如果未来同一 Hex 有多个单位，
-         * 优先选择最后绘制的单位。
+         * 后绘制单位优先。
          */
 
         for (
@@ -80,36 +439,100 @@ export class UnitSelection {
 
 
             const p =
-                this.renderer
-                    .worldToScreen(
-                        unit.q,
-                        unit.r
-                    );
+                this.getUnitScreenPosition(
+                    unit
+                );
 
 
-            const width =
-                50 *
-                this.renderer.camera.zoom;
+            if (!p) {
+
+                continue;
+
+            }
 
 
-            const height =
-                40 *
-                this.renderer.camera.zoom;
+            // =================================================
+            // 方法 A
+            //
+            // CSS 坐标直接检测
+            // =================================================
 
+            const hitCSS =
 
-            if (
                 mouseX >=
-                    p.x - width / 2 &&
+                    p.x - width / 2
+
+                &&
 
                 mouseX <=
-                    p.x + width / 2 &&
+                    p.x + width / 2
+
+                &&
 
                 mouseY >=
-                    p.y - height / 2 &&
+                    p.y - height / 2
+
+                &&
 
                 mouseY <=
-                    p.y + height / 2
-            ) {
+                    p.y + height / 2;
+
+
+            if (hitCSS) {
+
+                return unit;
+
+            }
+
+
+            // =================================================
+            // 方法 B
+            //
+            // DPR / Canvas 像素坐标检测
+            // =================================================
+
+            const canvasPX =
+                p.x * scaleX;
+
+
+            const canvasPY =
+                p.y * scaleY;
+
+
+            const canvasWidth =
+                width * scaleX;
+
+
+            const canvasHeight =
+                height * scaleY;
+
+
+            const hitCanvas =
+
+                mouseCanvasX >=
+                    canvasPX -
+                    canvasWidth / 2
+
+                &&
+
+                mouseCanvasX <=
+                    canvasPX +
+                    canvasWidth / 2
+
+                &&
+
+                mouseCanvasY >=
+                    canvasPY -
+                    canvasHeight / 2
+
+                &&
+
+                mouseCanvasY <=
+                    canvasPY +
+                    canvasHeight / 2;
+
+
+            if (hitCanvas) {
 
                 return unit;
 
@@ -127,12 +550,10 @@ export class UnitSelection {
     // 选择单位
     // ========================================================
 
-    select(
-        unit
-    ) {
+    select(unit) {
 
         this.selectedUnit =
-            unit;
+            unit ?? null;
 
 
         if (!unit) {
@@ -152,59 +573,16 @@ export class UnitSelection {
 
 
     // ========================================================
-    // 默认面板
+    // 清除选择
     // ========================================================
 
-    showDefault() {
+    clear() {
 
-        if (!this.infoPanel) {
-            return;
-        }
+        this.selectedUnit =
+            null;
 
 
-        this.infoPanel.innerHTML = `
-
-            <h2>
-                作战信息
-            </h2>
-
-            <p class="hint">
-                点击地图上的单位查看详情
-            </p>
-
-            <hr>
-
-            <h3>
-                地图操作
-            </h3>
-
-            <p>
-                鼠标拖动：移动地图
-            </p>
-
-            <p>
-                滚轮：缩放
-            </p>
-
-            <p>
-                点击单位：选择
-            </p>
-
-            <hr>
-
-            <h3>
-                图例
-            </h3>
-
-            <p>
-                德军：蓝灰色
-            </p>
-
-            <p>
-                苏军：红色
-            </p>
-
-        `;
+        this.showDefault();
 
     }
 
@@ -213,12 +591,17 @@ export class UnitSelection {
     // 是否己方单位
     // ========================================================
 
-    isFriendly(
-        unit
-    ) {
+    isFriendly(unit) {
+
+        if (!unit) {
+
+            return false;
+
+        }
+
 
         if (
-            !this.gameState
+            this.isObserver()
         ) {
 
             return true;
@@ -227,53 +610,167 @@ export class UnitSelection {
 
 
         if (
+            this.gameState &&
             typeof this.gameState
                 .isPlayerUnit ===
             "function"
         ) {
 
-            return this.gameState
-                .isPlayerUnit(
-                    unit
+            try {
+
+                return this.gameState
+                    .isPlayerUnit(
+                        unit
+                    );
+
+            }
+
+            catch (error) {
+
+                console.warn(
+                    "GameState.isPlayerUnit() 调用失败：",
+                    error
                 );
+
+            }
 
         }
 
 
-        return true;
+        const playerSide =
+            this.getPlayerSide();
 
-    }
 
+        if (!playerSide) {
 
-    // ========================================================
-    // 是否观察员
-    // ========================================================
+            return true;
 
-    isObserver() {
+        }
+
 
         return (
-            this.gameState &&
-            typeof this.gameState
-                .isObserver ===
-                "function" &&
-            this.gameState
-                .isObserver()
+
+            this.getUnitSide(unit) ===
+            playerSide
+
         );
 
     }
 
 
     // ========================================================
-    // 显示单位
+    // 默认面板
     // ========================================================
 
-    showUnit(
-        unit
-    ) {
+    showDefault() {
 
         if (!this.infoPanel) {
+
             return;
+
         }
+
+
+        /*
+         * 注意：
+         *
+         * 这里只修改 unitInfo。
+         *
+         * 不再覆盖整个 info-panel，
+         * 否则会把回合按钮一起删除。
+         */
+
+        if (
+            this.infoPanel.id ===
+            "unitInfo"
+        ) {
+
+            this.infoPanel.innerHTML =
+                "点击地图上的单位查看详情";
+
+            return;
+
+        }
+
+
+        this.infoPanel.innerHTML = `
+
+            <h3>
+                单位信息
+            </h3>
+
+            <p class="hint">
+                点击地图上的单位查看详情
+            </p>
+
+        `;
+
+    }
+
+
+    // ========================================================
+    // 显示单位信息
+    // ========================================================
+
+    showUnit(unit) {
+
+        if (
+            !this.infoPanel ||
+            !unit
+        ) {
+
+            return;
+
+        }
+
+
+        const side =
+            this.getUnitSide(
+                unit
+            );
+
+
+        const sideName =
+
+            side === "german"
+
+                ? "德军"
+
+                : side === "soviet"
+
+                    ? "苏军"
+
+                    : "未知";
+
+
+        const name =
+
+            unit.nameZh ??
+            unit.name ??
+            unit.id ??
+            "未命名单位";
+
+
+        const type =
+
+            unit.typeZh ??
+            unit.type ??
+            unit.unitType ??
+            "未知";
+
+
+        const ap =
+
+            unit.actionPoints ??
+            unit.ap ??
+            "—";
+
+
+        const maxAP =
+
+            unit.maxActionPoints ??
+            unit.maxAP ??
+            "—";
 
 
         const friendly =
@@ -282,139 +779,64 @@ export class UnitSelection {
             );
 
 
-        const observer =
-            this.isObserver();
+        // ----------------------------------------------------
+        // 敌军信息
+        // ----------------------------------------------------
 
+        if (!friendly) {
 
-        /*
-         * 观察员可以查看双方完整信息。
-         */
+            this.infoPanel.innerHTML = `
 
-        if (
-            !friendly &&
-            !observer
-        ) {
+                <div class="unit-title">
+                    ${name}
+                </div>
 
-            this.showEnemyUnit(
-                unit
-            );
+                <div class="unit-row">
+                    <span>阵营</span>
+                    <strong>
+                        ${sideName}
+                    </strong>
+                </div>
+
+                <div class="unit-row">
+                    <span>兵种</span>
+                    <strong>
+                        ${type}
+                    </strong>
+                </div>
+
+                <div class="unit-row">
+                    <span>位置</span>
+                    <strong>
+                        ${unit.q},
+                        ${unit.r}
+                    </strong>
+                </div>
+
+                <div class="unit-row">
+                    <span>情报</span>
+                    <strong>
+                        敌军单位
+                    </strong>
+                </div>
+
+            `;
+
 
             return;
 
         }
 
 
-        this.showFriendlyUnit(
-            unit
-        );
-
-    }
-
-
-    // ========================================================
-    // 己方 / 观察员完整情报
-    // ========================================================
-
-    showFriendlyUnit(
-        unit
-    ) {
-
-        const factionName =
-            this.getFactionName(
-                unit.faction
-            );
-
-
-        const typeName =
-            this.getTypeName(
-                unit.type
-            );
-
-
-        const levelName =
-            this.getLevelName(
-                unit.level ??
-                unit.size
-            );
-
-
-        const division =
-            unit.division ??
-            unit.parent?.division ??
-            "—";
-
-
-        const regiment =
-            unit.regiment ??
-            unit.parent?.regiment ??
-            "—";
-
-
-        const battalion =
-            unit.battalion ??
-            unit.parent?.battalion ??
-            "—";
-
-
-        const personnel =
-            unit.personnel ??
-            unit.strength ??
-            "—";
-
-
-        const maximum =
-            unit.maximum ??
-            unit.maxPersonnel ??
-            personnel;
-
-
-        const morale =
-            unit.morale ??
-            80;
-
-
-        const suppression =
-            unit.suppression ??
-            0;
-
-
-        const fatigue =
-            unit.fatigue ??
-            0;
-
-
-        const ammunition =
-            unit.ammunition ??
-            100;
-
-
-        const fuel =
-            unit.fuel ??
-            "—";
-
-
-        const currentMP =
-            unit.movementPoints ??
-            unit.maxMovementPoints ??
-            "—";
-
-
-        const maxMP =
-            unit.maxMovementPoints ??
-            unit.movement ??
-            "—";
-
+        // ----------------------------------------------------
+        // 己方完整信息
+        // ----------------------------------------------------
 
         this.infoPanel.innerHTML = `
 
-            <h2>
-                作战信息
-            </h2>
-
-
-            <h3>
-                ${unit.name ?? "未命名单位"}
-            </h3>
+            <div class="unit-title">
+                ${name}
+            </div>
 
 
             <div class="unit-row">
@@ -424,7 +846,7 @@ export class UnitSelection {
                 </span>
 
                 <strong>
-                    ${factionName}
+                    ${sideName}
                 </strong>
 
             </div>
@@ -437,7 +859,7 @@ export class UnitSelection {
                 </span>
 
                 <strong>
-                    ${typeName}
+                    ${type}
                 </strong>
 
             </div>
@@ -446,128 +868,14 @@ export class UnitSelection {
             <div class="unit-row">
 
                 <span>
-                    规模
+                    行动点
                 </span>
 
                 <strong>
-                    ${levelName}
+                    ${ap} / ${maxAP}
                 </strong>
 
             </div>
-
-
-            <hr>
-
-
-            <h3>
-                编制
-            </h3>
-
-
-            <div class="unit-row">
-
-                <span>
-                    师
-                </span>
-
-                <strong>
-                    ${division}
-                </strong>
-
-            </div>
-
-
-            <div class="unit-row">
-
-                <span>
-                    团
-                </span>
-
-                <strong>
-                    ${regiment}
-                </strong>
-
-            </div>
-
-
-            <div class="unit-row">
-
-                <span>
-                    营
-                </span>
-
-                <strong>
-                    ${battalion}
-                </strong>
-
-            </div>
-
-
-            <div class="unit-row">
-
-                <span>
-                    单位
-                </span>
-
-                <strong>
-                    ${unit.name ?? "—"}
-                </strong>
-
-            </div>
-
-
-            <hr>
-
-
-            <h3>
-                战斗实力
-            </h3>
-
-
-            <div class="unit-row">
-
-                <span>
-                    人员
-                </span>
-
-                <strong>
-                    ${personnel}
-                    /
-                    ${maximum}
-                </strong>
-
-            </div>
-
-
-            <hr>
-
-
-            <h3>
-                行动
-            </h3>
-
-
-            <div class="unit-row">
-
-                <span>
-                    移动点
-                </span>
-
-                <strong>
-                    ${currentMP}
-                    /
-                    ${maxMP}
-                </strong>
-
-            </div>
-
-
-            <hr>
-
-
-            <h3>
-                状态
-            </h3>
 
 
             <div class="unit-row">
@@ -577,7 +885,7 @@ export class UnitSelection {
                 </span>
 
                 <strong>
-                    ${morale}
+                    ${unit.morale ?? "—"}
                 </strong>
 
             </div>
@@ -590,7 +898,7 @@ export class UnitSelection {
                 </span>
 
                 <strong>
-                    ${suppression}
+                    ${unit.suppression ?? "—"}
                 </strong>
 
             </div>
@@ -603,7 +911,7 @@ export class UnitSelection {
                 </span>
 
                 <strong>
-                    ${fatigue}
+                    ${unit.fatigue ?? "—"}
                 </strong>
 
             </div>
@@ -616,7 +924,7 @@ export class UnitSelection {
                 </span>
 
                 <strong>
-                    ${ammunition}%
+                    ${unit.ammunition ?? "—"}
                 </strong>
 
             </div>
@@ -625,23 +933,7 @@ export class UnitSelection {
             <div class="unit-row">
 
                 <span>
-                    燃油
-                </span>
-
-                <strong>
-                    ${fuel}
-                </strong>
-
-            </div>
-
-
-            <hr>
-
-
-            <div class="unit-row">
-
-                <span>
-                    地图位置
+                    位置
                 </span>
 
                 <strong>
@@ -652,315 +944,6 @@ export class UnitSelection {
             </div>
 
         `;
-
-    }
-
-
-    // ========================================================
-    // 敌军有限情报
-    // ========================================================
-
-    showEnemyUnit(
-        unit
-    ) {
-
-        const factionName =
-            this.getFactionName(
-                unit.faction
-            );
-
-
-        const typeName =
-            this.getTypeName(
-                unit.type
-            );
-
-
-        const levelName =
-            this.getLevelName(
-                unit.level ??
-                unit.size
-            );
-
-
-        this.infoPanel.innerHTML = `
-
-            <h2>
-                敌军情报
-            </h2>
-
-
-            <h3>
-                敌军单位
-            </h3>
-
-
-            <div class="unit-row">
-
-                <span>
-                    阵营
-                </span>
-
-                <strong>
-                    ${factionName}
-                </strong>
-
-            </div>
-
-
-            <div class="unit-row">
-
-                <span>
-                    判断兵种
-                </span>
-
-                <strong>
-                    ${typeName}
-                </strong>
-
-            </div>
-
-
-            <div class="unit-row">
-
-                <span>
-                    估计规模
-                </span>
-
-                <strong>
-                    ${levelName}
-                </strong>
-
-            </div>
-
-
-            <hr>
-
-
-            <h3>
-                情报
-            </h3>
-
-
-            <div class="unit-row">
-
-                <span>
-                    番号
-                </span>
-
-                <strong>
-                    未确认
-                </strong>
-
-            </div>
-
-
-            <div class="unit-row">
-
-                <span>
-                    兵力
-                </span>
-
-                <strong>
-                    未知
-                </strong>
-
-            </div>
-
-
-            <div class="unit-row">
-
-                <span>
-                    装备
-                </span>
-
-                <strong>
-                    未确认
-                </strong>
-
-            </div>
-
-
-            <div class="unit-row">
-
-                <span>
-                    士气
-                </span>
-
-                <strong>
-                    未知
-                </strong>
-
-            </div>
-
-
-            <div class="unit-row">
-
-                <span>
-                    弹药
-                </span>
-
-                <strong>
-                    未知
-                </strong>
-
-            </div>
-
-
-            <hr>
-
-
-            <div class="unit-row">
-
-                <span>
-                    情报可信度
-                </span>
-
-                <strong>
-                    低
-                </strong>
-
-            </div>
-
-        `;
-
-    }
-
-
-    // ========================================================
-    // 阵营名称
-    // ========================================================
-
-    getFactionName(
-        faction
-    ) {
-
-        const names = {
-
-            GER:
-                "德军",
-
-            germany:
-                "德军",
-
-            German:
-                "德军",
-
-            USSR:
-                "苏军",
-
-            soviet:
-                "苏军",
-
-            Soviet:
-                "苏军"
-
-        };
-
-
-        return (
-            names[faction] ??
-            faction ??
-            "未知"
-        );
-
-    }
-
-
-    // ========================================================
-    // 兵种名称
-    // ========================================================
-
-    getTypeName(
-        type
-    ) {
-
-        const names = {
-
-            infantry:
-                "步兵",
-
-            motorized:
-                "摩托化步兵",
-
-            armor:
-                "装甲兵",
-
-            artillery:
-                "炮兵",
-
-            antitank:
-                "反坦克兵",
-
-            antiair:
-                "防空兵",
-
-            engineer:
-                "工兵",
-
-            reconnaissance:
-                "侦察兵",
-
-            cavalry:
-                "骑兵",
-
-            headquarters:
-                "指挥部"
-
-        };
-
-
-        return (
-            names[type] ??
-            type ??
-            "未知"
-        );
-
-    }
-
-
-    // ========================================================
-    // 单位规模
-    // ========================================================
-
-    getLevelName(
-        level
-    ) {
-
-        const names = {
-
-            squad:
-                "班",
-
-            platoon:
-                "排",
-
-            company:
-                "连",
-
-            battalion:
-                "营",
-
-            regiment:
-                "团",
-
-            brigade:
-                "旅",
-
-            division:
-                "师",
-
-            corps:
-                "军"
-
-        };
-
-
-        return (
-            names[level] ??
-            level ??
-            "—"
-        );
 
     }
 
