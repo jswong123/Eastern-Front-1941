@@ -1,21 +1,82 @@
-import { WorldMap } from "./WorldMap.js";
-import { Renderer } from "./Renderer.js";
-import { Camera } from "./Camera.js";
-import { UnitSelection } from "./UnitSelection.js";
+import {
+    WorldMap
+} from "./WorldMap.js";
 
+
+import {
+    Renderer
+} from "./Renderer.js";
+
+
+import {
+    Camera
+} from "./Camera.js";
+
+
+import {
+    UnitSelection
+} from "./UnitSelection.js";
+
+
+import {
+    GameState
+} from "./GameState.js";
+
+
+import {
+    FactionSelection
+} from "./FactionSelection.js";
+
+
+// ========================================
+// DOM
+// ========================================
 
 const canvas =
-    document.getElementById("gameCanvas");
+    document.getElementById(
+        "gameCanvas"
+    );
+
 
 const unitInfo =
-    document.getElementById("unitInfo");
+    document.getElementById(
+        "unitInfo"
+    );
 
+
+if (!canvas) {
+
+    throw new Error(
+        "找不到 gameCanvas"
+    );
+
+}
+
+
+if (!unitInfo) {
+
+    throw new Error(
+        "找不到 unitInfo"
+    );
+
+}
+
+
+// ========================================
+// 游戏核心对象
+// ========================================
 
 const world =
     new WorldMap();
 
+
+const gameState =
+    new GameState();
+
+
 const camera =
     new Camera();
+
 
 const renderer =
     new Renderer(
@@ -24,23 +85,45 @@ const renderer =
     );
 
 
-// V0.2 独立 Camera
-renderer.camera = camera;
+/*
+ * Renderer 使用独立 Camera。
+ */
+
+renderer.camera =
+    camera;
 
 
 const selection =
     new UnitSelection(
         renderer,
-        unitInfo
+        unitInfo,
+        gameState
     );
 
+
+const factionSelection =
+    new FactionSelection(
+        gameState
+    );
+
+
+// ========================================
+// 数据
+// ========================================
 
 let units = [];
 
 
-// ===============================
-// 场景加载
-// ===============================
+// ========================================
+// 鼠标状态
+// ========================================
+
+let dragDistance = 0;
+
+
+// ========================================
+// 加载场景
+// ========================================
 
 async function loadScenario() {
 
@@ -51,7 +134,10 @@ async function loadScenario() {
                 "./data/scenario.json"
             );
 
-        if (!response.ok) {
+
+        if (
+            !response.ok
+        ) {
 
             throw new Error(
                 `HTTP ${response.status}`
@@ -59,19 +145,85 @@ async function loadScenario() {
 
         }
 
+
         const data =
             await response.json();
 
+
         units =
-            data.units ?? [];
+            data.units ??
+            [];
+
+
+        /*
+         * 给旧版 scenario.json
+         * 自动补充 faction。
+         *
+         * 这样我们暂时不用立刻重写
+         * 全部测试单位数据。
+         */
+
+        units =
+            units.map(
+                unit => {
+
+                    if (
+                        !unit.faction
+                    ) {
+
+                        if (
+                            unit.side ===
+                            "germany"
+                        ) {
+
+                            unit.faction =
+                                "GER";
+
+                        }
+
+
+                        else if (
+                            unit.side ===
+                            "soviet"
+                        ) {
+
+                            unit.faction =
+                                "USSR";
+
+                        }
+
+                    }
+
+
+                    return unit;
+
+                }
+            );
+
 
         console.log(
-            "场景加载成功：",
+            "战役数据加载完成：",
             units.length,
             "个单位"
         );
 
+
+        /*
+         * 先绘制背景地图。
+         *
+         * 阵营选择窗口会覆盖其上。
+         */
+
         render();
+
+
+        /*
+         * 然后打开阵营选择。
+         */
+
+        factionSelection.show(
+            startGame
+        );
 
     }
 
@@ -82,9 +234,17 @@ async function loadScenario() {
             error
         );
 
+
         unitInfo.innerHTML = `
-            <strong>战役加载失败</strong>
-            <p>${error.message}</p>
+
+            <strong>
+                战役加载失败
+            </strong>
+
+            <p>
+                ${error.message}
+            </p>
+
         `;
 
     }
@@ -92,29 +252,118 @@ async function loadScenario() {
 }
 
 
-// ===============================
+// ========================================
+// 开始游戏
+// ========================================
+
+function startGame() {
+
+    selection.select(
+        null
+    );
+
+
+    console.log(
+        "游戏模式：",
+        gameState.mode
+    );
+
+
+    console.log(
+        "玩家阵营：",
+        gameState.playerFaction
+    );
+
+
+    updateInterface();
+
+
+    render();
+}
+
+
+// ========================================
+// 更新网页状态
+// ========================================
+
+function updateInterface() {
+
+    if (
+        gameState.isObserver()
+    ) {
+
+        document.title =
+            "东线 1941 · 观察员";
+
+    }
+
+    else {
+
+        const faction =
+            gameState.factions[
+                gameState.playerFaction
+            ];
+
+
+        document.title =
+            `东线 1941 · ${
+                faction?.name ??
+                ""
+            }`;
+
+    }
+
+
+    /*
+     * 尝试更新顶部版本号。
+     *
+     * 如果当前 HTML 没有这些元素，
+     * 不会导致游戏报错。
+     */
+
+    const versionElement =
+        document.getElementById(
+            "version"
+        );
+
+
+    if (
+        versionElement
+    ) {
+
+        versionElement.textContent =
+            "V0.3";
+
+    }
+}
+
+
+// ========================================
 // 主渲染
-// ===============================
+// ========================================
 
 function render() {
 
-    renderer.render(units);
+    renderer.render(
+        units
+    );
 
 
-    if (selection.selectedUnit) {
+    if (
+        selection.selectedUnit
+    ) {
 
         drawSelection(
             selection.selectedUnit
         );
 
     }
-
 }
 
 
-// ===============================
-// 选中框
-// ===============================
+// ========================================
+// 单位选择框
+// ========================================
 
 function drawSelection(unit) {
 
@@ -129,18 +378,28 @@ function drawSelection(unit) {
         renderer.ctx;
 
 
-    const zoom =
+    /*
+     * 与 Renderer 中的军标缩放逻辑一致。
+     */
+
+    const scale =
         Math.max(
             0.75,
-            camera.zoom
+            Math.min(
+                1.35,
+                camera.zoom
+            )
         );
 
 
     const width =
-        66 * zoom;
+        70 *
+        scale;
+
 
     const height =
-        52 * zoom;
+        56 *
+        scale;
 
 
     ctx.save();
@@ -149,25 +408,33 @@ function drawSelection(unit) {
     ctx.strokeStyle =
         "#f4d35e";
 
-    ctx.lineWidth = 3;
+
+    ctx.lineWidth =
+        3;
 
 
     ctx.strokeRect(
-        position.x - width / 2,
-        position.y - height / 2,
+
+        position.x -
+            width / 2,
+
+        position.y -
+            height / 2,
+
         width,
+
         height
+
     );
 
 
     ctx.restore();
-
 }
 
 
-// ===============================
-// Canvas尺寸
-// ===============================
+// ========================================
+// 浏览器窗口尺寸变化
+// ========================================
 
 window.addEventListener(
     "resize",
@@ -181,18 +448,30 @@ window.addEventListener(
 );
 
 
-// ===============================
-// 地图拖动
-// ===============================
-
-let dragDistance = 0;
-
+// ========================================
+// 地图拖动：开始
+// ========================================
 
 canvas.addEventListener(
     "mousedown",
     event => {
 
+        /*
+         * 尚未选择阵营时，
+         * 不允许操作背景地图。
+         */
+
+        if (
+            gameState.mode === null
+        ) {
+
+            return;
+
+        }
+
+
         dragDistance = 0;
+
 
         camera.startDrag(
             event.clientX,
@@ -203,11 +482,17 @@ canvas.addEventListener(
 );
 
 
+// ========================================
+// 地图拖动：移动
+// ========================================
+
 window.addEventListener(
     "mousemove",
     event => {
 
-        if (!camera.dragging) {
+        if (
+            !camera.dragging
+        ) {
 
             return;
 
@@ -217,6 +502,7 @@ window.addEventListener(
         const dx =
             event.clientX -
             camera.lastX;
+
 
         const dy =
             event.clientY -
@@ -240,6 +526,10 @@ window.addEventListener(
 );
 
 
+// ========================================
+// 地图拖动：结束
+// ========================================
+
 window.addEventListener(
     "mouseup",
     () => {
@@ -250,20 +540,35 @@ window.addEventListener(
 );
 
 
-// ===============================
-// 单位点击
-// ===============================
+// ========================================
+// 点击单位
+// ========================================
 
 canvas.addEventListener(
     "click",
     event => {
 
         /*
-         * 如果刚刚进行了明显拖拽，
-         * 就不把它当作点击。
+         * 必须先选择阵营。
          */
 
-        if (dragDistance > 8) {
+        if (
+            gameState.mode === null
+        ) {
+
+            return;
+
+        }
+
+
+        /*
+         * 明显拖动地图后，
+         * 不触发单位选择。
+         */
+
+        if (
+            dragDistance > 8
+        ) {
 
             dragDistance = 0;
 
@@ -273,52 +578,36 @@ canvas.addEventListener(
 
 
         const rect =
-            canvas.getBoundingClientRect();
+            canvas
+                .getBoundingClientRect();
 
 
         const mouseX =
             event.clientX -
             rect.left;
 
+
         const mouseY =
             event.clientY -
             rect.top;
 
 
-        console.log(
-            "地图点击：",
-            mouseX,
-            mouseY
-        );
-
-
         const unit =
             selection.findUnitAt(
+
                 mouseX,
+
                 mouseY,
+
                 units
+
             );
 
 
-        if (unit) {
+        selection.select(
+            unit
+        );
 
-            console.log(
-                "选中单位：",
-                unit
-            );
-
-        }
-
-        else {
-
-            console.log(
-                "未点击到单位"
-            );
-
-        }
-
-
-        selection.select(unit);
 
         render();
 
@@ -326,13 +615,27 @@ canvas.addEventListener(
 );
 
 
-// ===============================
-// 缩放
-// ===============================
+// ========================================
+// 地图缩放
+// ========================================
 
 canvas.addEventListener(
     "wheel",
     event => {
+
+        /*
+         * 阵营选择界面存在时，
+         * 不操作地图。
+         */
+
+        if (
+            gameState.mode === null
+        ) {
+
+            return;
+
+        }
+
 
         event.preventDefault();
 
@@ -352,9 +655,9 @@ canvas.addEventListener(
 );
 
 
-// ===============================
-// 防止拖拽锁死
-// ===============================
+// ========================================
+// 防止窗口失焦后拖动锁死
+// ========================================
 
 window.addEventListener(
     "blur",
@@ -366,16 +669,16 @@ window.addEventListener(
 );
 
 
-// ===============================
+// ========================================
 // 全局错误监控
-// ===============================
+// ========================================
 
 window.addEventListener(
     "error",
     event => {
 
         console.error(
-            "游戏错误：",
+            "游戏运行错误：",
             event.error ??
             event.message
         );
@@ -389,7 +692,7 @@ window.addEventListener(
     event => {
 
         console.error(
-            "异步错误：",
+            "异步运行错误：",
             event.reason
         );
 
@@ -397,8 +700,8 @@ window.addEventListener(
 );
 
 
-// ===============================
+// ========================================
 // 启动
-// ===============================
+// ========================================
 
 loadScenario();
