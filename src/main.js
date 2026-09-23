@@ -2,7 +2,7 @@
 
 // main.js
 
-// 东线 1941 V0.6 — main 集成战斗 / AI 版本
+// 东线 1941 V0.9 — CombatSystem / AISystem 接口兼容版
 
 // ============================================================
 
@@ -23,6 +23,10 @@ import { FactionSelection } from "./FactionSelection.js";
 import { TurnSystem } from "./TurnSystem.js";
 
 import { MovementSystem } from "./systems/MovementSystem.js";
+
+import { CombatSystem } from "./systems/CombatSystem.js";
+
+import { AISystem } from "./systems/AISystem.js";
 
 import { pixelToHex } from "./Hex.js";
 
@@ -168,6 +172,28 @@ const movementSystem =
 
  
 
+const combatSystem =
+
+    new CombatSystem(
+
+        world
+
+    );
+
+ 
+
+const aiSystem =
+
+    new AISystem(
+
+        movementSystem,
+
+        combatSystem
+
+    );
+
+ 
+
 const factionSelection =
 
     new FactionSelection(
@@ -216,9 +242,9 @@ let selectedUnit = null;
 
 // ============================================================
 
-// V0.6：main.js 内置战斗 / AI 状态
+// V0.9：使用项目现有 CombatSystem / AISystem
 
-// 其余系统文件保持不变
+// 不调用不存在的 getAP() / getStrength()
 
 // ============================================================
 
@@ -227,10 +253,6 @@ let selectedUnit = null;
 let gameOver = false;
 
 let aiRunning = false;
-
-const ATTACK_AP_COST = 2;
-
-const DEFAULT_ATTACK_RANGE = 1;
 
  
 
@@ -568,13 +590,27 @@ function initializeUnits() {
 
  
 
-            unit.side =
+            unit.side = side;
 
-                side;
+            unit.faction = side;
 
  
 
         }
+
+ 
+
+        // CombatSystem 以 strength / hasAttacked 为核心状态
+
+        if (unit.strength == null) {
+
+            unit.strength = 100;
+
+        }
+
+ 
+
+        combatSystem.resetUnit(unit);
 
  
 
@@ -1530,7 +1566,7 @@ function showUnitInfo(unit) {
 
     const ap =
 
- 
+        unit.movementPoints ??
 
         unit.actionPoints ??
 
@@ -1540,17 +1576,25 @@ function showUnitInfo(unit) {
 
  
 
- 
-
     const maxAP =
 
- 
+        unit.maxMovementPoints ??
 
         unit.maxActionPoints ??
 
         unit.maxAP ??
 
         "—";
+
+ 
+
+    const strength = getUnitStrength(unit);
+
+    const attackValue = combatSystem.getAttack(unit);
+
+    const defenseValue = combatSystem.getDefense(unit);
+
+    const rangeValue = combatSystem.getRange(unit);
 
  
 
@@ -1615,6 +1659,56 @@ function showUnitInfo(unit) {
                 ${ap} / ${maxAP}
 
             </strong>
+
+        </div>
+
+ 
+
+        <div class="unit-row">
+
+            <span>兵力</span>
+
+            <strong>${strength}</strong>
+
+        </div>
+
+ 
+
+        <div class="unit-row">
+
+            <span>攻击</span>
+
+            <strong>${attackValue}</strong>
+
+        </div>
+
+ 
+
+        <div class="unit-row">
+
+            <span>防御</span>
+
+            <strong>${defenseValue}</strong>
+
+        </div>
+
+ 
+
+        <div class="unit-row">
+
+            <span>射程</span>
+
+            <strong>${rangeValue}</strong>
+
+        </div>
+
+ 
+
+        <div class="unit-row">
+
+            <span>攻击状态</span>
+
+            <strong>${unit.hasAttacked ? "本阶段已攻击" : "可攻击"}</strong>
 
         </div>
 
@@ -3146,77 +3240,17 @@ function tryMoveSelectedUnit(q, r) {
 
 // ============================================================
 
-// V0.6 战斗与 AI（仅 main.js）
+// V0.9 战斗与 AI
+
+// 严格使用 CombatSystem.js / AISystem.js 已存在的接口
 
 // ============================================================
 
  
 
-function hexDistance(a, b) {
+function unitName(unit) {
 
-    const aq = Number(a?.q ?? 0);
-
-    const ar = Number(a?.r ?? 0);
-
-    const bq = Number(b?.q ?? 0);
-
-    const br = Number(b?.r ?? 0);
-
-    const as = -aq - ar;
-
-    const bs = -bq - br;
-
-    return Math.max(
-
-        Math.abs(aq - bq),
-
-        Math.abs(ar - br),
-
-        Math.abs(as - bs)
-
-    );
-
-}
-
- 
-
-function getAttackRange(unit) {
-
-    const explicit = Number(
-
-        unit?.attackRange ??
-
-        unit?.range ??
-
-        unit?.weaponRange
-
-    );
-
-    if (Number.isFinite(explicit) && explicit > 0) {
-
-        return explicit;
-
-    }
-
-    const type = String(
-
-        unit?.type ?? unit?.unitType ?? ""
-
-    ).toLowerCase();
-
-    if (
-
-        type.includes("artillery") ||
-
-        type.includes("炮")
-
-    ) {
-
-        return 3;
-
-    }
-
-    return DEFAULT_ATTACK_RANGE;
+    return unit?.nameZh ?? unit?.name ?? unit?.id ?? "未命名单位";
 
 }
 
@@ -3224,185 +3258,9 @@ function getAttackRange(unit) {
 
 function getUnitStrength(unit) {
 
-    const candidates = [
+    const value = Number(unit?.strength ?? 100);
 
-        unit?.personnel,
-
-        unit?.strength,
-
-        unit?.hp,
-
-        unit?.health
-
-    ];
-
-    for (const value of candidates) {
-
-        const n = Number(value);
-
-        if (Number.isFinite(n)) return n;
-
-    }
-
-    return 100;
-
-}
-
- 
-
-function setUnitStrength(unit, value) {
-
-    const next = Math.max(0, Math.round(value));
-
-    if (unit.personnel != null) unit.personnel = next;
-
-    else if (unit.strength != null) unit.strength = next;
-
-    else if (unit.hp != null) unit.hp = next;
-
-    else if (unit.health != null) unit.health = next;
-
-    else unit.strength = next;
-
-}
-
- 
-
-function getAttackPower(unit) {
-
-    const values = [
-
-        unit?.attack,
-
-        unit?.attackPower,
-
-        unit?.softAttack,
-
-        unit?.firepower,
-
-        unit?.combatPower
-
-    ];
-
-    for (const value of values) {
-
-        const n = Number(value);
-
-        if (Number.isFinite(n) && n > 0) return n;
-
-    }
-
-    const type = String(
-
-        unit?.type ?? unit?.unitType ?? ""
-
-    ).toLowerCase();
-
-    if (type.includes("armor") || type.includes("tank") || type.includes("坦克")) return 30;
-
-    if (type.includes("artillery") || type.includes("炮")) return 26;
-
-    if (type.includes("antitank") || type.includes("反坦克")) return 24;
-
-    if (type.includes("infantry") || type.includes("步兵")) return 18;
-
-    return 16;
-
-}
-
- 
-
-function getDefensePower(unit) {
-
-    const values = [
-
-        unit?.defense,
-
-        unit?.defence,
-
-        unit?.armor,
-
-        unit?.protection
-
-    ];
-
-    for (const value of values) {
-
-        const n = Number(value);
-
-        if (Number.isFinite(n) && n >= 0) return n;
-
-    }
-
-    return 10;
-
-}
-
- 
-
-function getUnitAPValue(unit) {
-
-    return Number(
-
-        unit?.actionPoints ??
-
-        unit?.ap ??
-
-        unit?.movementPoints ??
-
-        0
-
-    );
-
-}
-
- 
-
-function spendUnitAP(unit, amount) {
-
-    const cost = Math.max(0, Number(amount) || 0);
-
-    const current = getUnitAPValue(unit);
-
-    const next = Math.max(0, current - cost);
-
-    if (unit.actionPoints != null) unit.actionPoints = next;
-
-    else if (unit.ap != null) unit.ap = next;
-
-    else unit.actionPoints = next;
-
-    if (unit.movementPoints != null) {
-
-        unit.movementPoints = Math.min(unit.movementPoints, next);
-
-    }
-
-}
-
- 
-
-function unitCanAttack(attacker, defender) {
-
-    if (!attacker || !defender || attacker === defender) return false;
-
-    if (getUnitSide(attacker) === getUnitSide(defender)) return false;
-
-    if (getUnitStrength(attacker) <= 0 || getUnitStrength(defender) <= 0) return false;
-
-    if (getUnitAPValue(attacker) < ATTACK_AP_COST) return false;
-
-    if ((Number(attacker.ammunition) || 0) <= 0 && attacker.ammunition != null) return false;
-
-    return hexDistance(attacker, defender) <= getAttackRange(attacker);
-
-}
-
- 
-
-function unitName(unit) {
-
-    return unit?.nameZh ?? unit?.name ?? unit?.id ?? "未命名单位";
+    return Number.isFinite(value) ? value : 100;
 
 }
 
@@ -3426,19 +3284,17 @@ function writeBattleMessage(message) {
 
 function removeDestroyedUnits() {
 
-    const destroyed = units.filter(unit => getUnitStrength(unit) <= 0);
+    for (const unit of units) {
 
-    if (destroyed.length === 0) return;
+        if (unit.destroyed || getUnitStrength(unit) <= 0) {
 
-    for (const unit of destroyed) {
+            unit.destroyed = true;
 
-        console.log("单位被消灭：", unitName(unit));
+            if (selectedUnit === unit) selectedUnit = null;
 
-        if (selectedUnit === unit) selectedUnit = null;
+        }
 
     }
-
-    units = units.filter(unit => getUnitStrength(unit) > 0);
 
 }
 
@@ -3446,27 +3302,69 @@ function removeDestroyedUnits() {
 
 function checkVictory() {
 
-    const germanAlive = units.some(unit => getUnitSide(unit) === "german" && getUnitStrength(unit) > 0);
+    const germanAlive = units.some(unit =>
 
-    const sovietAlive = units.some(unit => getUnitSide(unit) === "soviet" && getUnitStrength(unit) > 0);
+        getUnitSide(unit) === "german" &&
+
+        !unit.destroyed &&
+
+        getUnitStrength(unit) > 0
+
+    );
+
+ 
+
+    const sovietAlive = units.some(unit =>
+
+        getUnitSide(unit) === "soviet" &&
+
+        !unit.destroyed &&
+
+        getUnitStrength(unit) > 0
+
+    );
+
+ 
 
     if (germanAlive && sovietAlive) return false;
+
+ 
 
     gameOver = true;
 
     clearSelection();
 
-    const winner = germanAlive ? "德军胜利" : sovietAlive ? "苏军胜利" : "双方均无可战单位";
+ 
+
+    const winner = germanAlive
+
+        ? "德军胜利"
+
+        : sovietAlive
+
+            ? "苏军胜利"
+
+            : "双方均无可战单位";
+
+ 
 
     if (unitInfo) {
 
-        unitInfo.innerHTML = `<div class="unit-title">战斗结束</div><div class="unit-row"><strong>${winner}</strong></div>`;
+        unitInfo.innerHTML =
+
+            `<div class="unit-title">战斗结束</div>` +
+
+            `<div class="unit-row"><strong>${winner}</strong></div>`;
 
     }
+
+ 
 
     if (turnInfo) turnInfo.textContent = winner;
 
     if (endPhaseButton) endPhaseButton.disabled = true;
+
+ 
 
     render();
 
@@ -3478,61 +3376,59 @@ function checkVictory() {
 
 function performAttack(attacker, defender, { ai = false } = {}) {
 
-    if (gameOver || !unitCanAttack(attacker, defender)) return false;
+    if (gameOver || !attacker || !defender) return false;
 
  
 
-    const attack = getAttackPower(attacker);
+    // CombatSystem.canAttack 会统一检查：敌我、存活、射程、hasAttacked
 
-    const defense = getDefensePower(defender);
+    if (!combatSystem.canAttack(attacker, defender)) {
 
-    const moraleFactor = Math.max(0.55, Math.min(1.15, Number(attacker.morale ?? 80) / 80));
-
-    const suppressionFactor = Math.max(0.45, 1 - Number(attacker.suppression ?? 0) / 150);
-
-    const randomFactor = 0.85 + Math.random() * 0.30;
-
-    const rawDamage = attack * moraleFactor * suppressionFactor * randomFactor - defense * 0.35;
-
-    const damage = Math.max(1, Math.round(rawDamage));
-
- 
-
-    const before = getUnitStrength(defender);
-
-    const after = Math.max(0, before - damage);
-
-    setUnitStrength(defender, after);
-
-    spendUnitAP(attacker, ATTACK_AP_COST);
-
- 
-
-    if (attacker.ammunition != null) {
-
-        attacker.ammunition = Math.max(0, Number(attacker.ammunition) - 5);
+        return false;
 
     }
 
-    defender.suppression = Math.min(100, Number(defender.suppression ?? 0) + Math.max(5, Math.round(damage / 2)));
+ 
 
-    defender.morale = Math.max(0, Number(defender.morale ?? 80) - Math.max(2, Math.round(damage / 4)));
+    const result = combatSystem.attack(attacker, defender);
+
+ 
+
+    if (!result?.success) {
+
+        writeBattleMessage(result?.reason ?? "攻击失败");
+
+        return false;
+
+    }
 
  
 
     const prefix = ai ? "苏军 AI：" : "";
 
-    const message = `${prefix}${unitName(attacker)} 攻击 ${unitName(defender)}，造成 ${damage} 点损失（${before} → ${after}）`;
+    const destroyedText = result.destroyed ? "，目标被消灭" : "";
 
-    writeBattleMessage(message);
+ 
+
+    writeBattleMessage(
+
+        `${prefix}${unitName(attacker)} 攻击 ${unitName(defender)}，` +
+
+        `造成 ${result.damage} 点损失` +
+
+        `（${result.beforeStrength} → ${result.afterStrength}）${destroyedText}`
+
+    );
 
  
 
     removeDestroyedUnits();
 
+ 
+
     if (!checkVictory()) {
 
-        if (selectedUnit && units.includes(selectedUnit)) {
+        if (selectedUnit && !selectedUnit.destroyed) {
 
             showUnitInfo(selectedUnit);
 
@@ -3544,143 +3440,19 @@ function performAttack(attacker, defender, { ai = false } = {}) {
 
     }
 
+ 
+
     return true;
 
 }
 
  
 
-function findNearestEnemy(unit) {
+function resetFactionForPhase(faction) {
 
-    const side = getUnitSide(unit);
+    movementSystem.resetFaction?.(units, faction);
 
-    let best = null;
-
-    let bestDistance = Infinity;
-
-    for (const other of units) {
-
-        if (other === unit || getUnitSide(other) === side || getUnitStrength(other) <= 0) continue;
-
-        const distance = hexDistance(unit, other);
-
-        if (distance < bestDistance) {
-
-            bestDistance = distance;
-
-            best = other;
-
-        }
-
-    }
-
-    return best;
-
-}
-
- 
-
-function getReachableEntries() {
-
-    const reachable = movementSystem.reachable;
-
-    if (reachable instanceof Map) return [...reachable.entries()];
-
-    if (reachable && typeof reachable === "object") return Object.entries(reachable);
-
-    return [];
-
-}
-
- 
-
-function moveUnitDirect(unit, q, r, cost) {
-
-    const oldSelected = selectedUnit;
-
-    selectedUnit = unit;
-
-    const moved = tryMoveSelectedUnit(q, r);
-
-    selectedUnit = oldSelected;
-
-    if (moved) return true;
-
- 
-
-    // 兼容 MovementSystem 自带 moveTo
-
-    if (typeof movementSystem.moveTo === "function") {
-
-        try {
-
-            movementSystem.selectUnit?.(unit, units);
-
-            const result = movementSystem.moveTo(q, r);
-
-            if (result) {
-
-                unit.q = q;
-
-                unit.r = r;
-
-                if (Number.isFinite(Number(cost))) spendUnitAP(unit, Number(cost));
-
-                return true;
-
-            }
-
-        } catch (error) {
-
-            console.warn("AI 移动失败：", error);
-
-        }
-
-    }
-
-    return false;
-
-}
-
- 
-
-function aiMoveToward(unit, target) {
-
-    calculateReachable(unit);
-
-    const entries = getReachableEntries();
-
-    let best = null;
-
-    let bestDistance = hexDistance(unit, target);
-
-    for (const [key, data] of entries) {
-
-        const [qText, rText] = String(key).split(",");
-
-        const q = Number(qText);
-
-        const r = Number(rText);
-
-        if (!Number.isFinite(q) || !Number.isFinite(r)) continue;
-
-        if (unitAtHex(q, r) && !(q === Number(unit.q) && r === Number(unit.r))) continue;
-
-        const distance = hexDistance({ q, r }, target);
-
-        if (distance < bestDistance) {
-
-            bestDistance = distance;
-
-            best = { q, r, cost: getMovementCost(data) };
-
-        }
-
-    }
-
-    if (!best) return false;
-
-    return moveUnitDirect(unit, best.q, best.r, best.cost);
+    combatSystem.resetFaction?.(units, faction);
 
 }
 
@@ -3700,6 +3472,8 @@ async function runSovietAI() {
 
     if (normalizeSide(turnSystem.phase) !== "soviet") return;
 
+ 
+
     aiRunning = true;
 
     if (endPhaseButton) endPhaseButton.disabled = true;
@@ -3708,37 +3482,81 @@ async function runSovietAI() {
 
     try {
 
-        const sovietUnits = units.filter(unit => getUnitSide(unit) === "soviet" && getUnitStrength(unit) > 0);
+        resetFactionForPhase("soviet");
+
+ 
+
+        const sovietUnits = units.filter(unit =>
+
+            getUnitSide(unit) === "soviet" &&
+
+            !unit.destroyed &&
+
+            getUnitStrength(unit) > 0
+
+        );
+
+ 
 
         for (const unit of sovietUnits) {
 
-            if (gameOver || normalizeSide(turnSystem.phase) !== "soviet") break;
-
-            let target = findNearestEnemy(unit);
-
-            if (!target) break;
+            if (gameOver) break;
 
  
 
-            if (!unitCanAttack(unit, target)) {
+            const result = aiSystem.actUnit(unit, units);
 
-                aiMoveToward(unit, target);
+ 
 
-                await sleep(180);
+            if (result?.type === "attack" && result.result?.success) {
 
-                target = findNearestEnemy(unit);
+                const combat = result.result;
+
+                writeBattleMessage(
+
+                    `苏军 AI：${unitName(combat.attacker)} 攻击 ${unitName(combat.defender)}，` +
+
+                    `造成 ${combat.damage} 点损失` +
+
+                    `（${combat.beforeStrength} → ${combat.afterStrength}）` +
+
+                    `${combat.destroyed ? "，目标被消灭" : ""}`
+
+                );
 
             }
 
  
 
-            if (target && unitCanAttack(unit, target)) {
+            if (result?.type === "move-and-attack" && result.combat?.success) {
 
-                performAttack(unit, target, { ai: true });
+                const combat = result.combat;
 
-                await sleep(220);
+                writeBattleMessage(
+
+                    `苏军 AI：${unitName(combat.attacker)} 移动后攻击 ${unitName(combat.defender)}，` +
+
+                    `造成 ${combat.damage} 点损失` +
+
+                    `（${combat.beforeStrength} → ${combat.afterStrength}）` +
+
+                    `${combat.destroyed ? "，目标被消灭" : ""}`
+
+                );
 
             }
+
+ 
+
+            removeDestroyedUnits();
+
+            render();
+
+ 
+
+            if (checkVictory()) break;
+
+            await sleep(220);
 
         }
 
@@ -3750,9 +3568,31 @@ async function runSovietAI() {
 
             turnSystem.endPhase?.();
 
+ 
+
+            // 新的德军阶段恢复移动与攻击状态
+
+            resetFactionForPhase("german");
+
+ 
+
             updateTurnUI();
 
             render();
+
+        }
+
+    } catch (error) {
+
+        console.error("苏军 AI 行动失败：", error);
+
+        if (unitInfo) {
+
+            unitInfo.innerHTML =
+
+                `<div class="unit-title">AI 行动失败</div>` +
+
+                `<div>${error?.message ?? error}</div>`;
 
         }
 
