@@ -1504,7 +1504,6 @@ calculateReachable(
 console.log("移动范围计算完成");
 console.log("reachable =", reachable);
     else {
-
         clearReachable();
 
     }
