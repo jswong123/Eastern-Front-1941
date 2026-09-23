@@ -1136,7 +1136,15 @@ function showUnitInfo(unit) {
 // 计算移动范围
 // ============================================================
 
+// ============================================================
+// 计算移动范围
+// ============================================================
+
 function calculateReachable(unit) {
+
+    // --------------------------------------------------------
+    // 清除旧范围
+    // --------------------------------------------------------
 
     clearReachable();
 
@@ -1146,6 +1154,199 @@ function calculateReachable(unit) {
         return;
 
     }
+
+
+    // --------------------------------------------------------
+    // 当前单位不能行动
+    // --------------------------------------------------------
+
+    if (
+        !playerCanControlUnit(unit)
+    ) {
+
+        return;
+
+    }
+
+
+    // --------------------------------------------------------
+    // 初始化移动数据
+    // --------------------------------------------------------
+
+    if (
+        typeof movementSystem.initializeUnit ===
+        "function"
+    ) {
+
+        movementSystem.initializeUnit(
+            unit
+        );
+
+    }
+
+
+    // --------------------------------------------------------
+    // 同步行动点
+    //
+    // TurnSystem 使用 actionPoints
+    // MovementSystem 使用 movementPoints
+    //
+    // 暂时让两者保持一致
+    // --------------------------------------------------------
+
+    const currentAP =
+
+        unit.actionPoints ??
+        unit.ap ??
+        unit.movementPoints ??
+        unit.maxMovementPoints ??
+        0;
+
+
+    if (
+        Number.isFinite(
+            Number(currentAP)
+        )
+    ) {
+
+        unit.movementPoints =
+            Number(currentAP);
+
+    }
+
+
+    // --------------------------------------------------------
+    // MovementSystem.js 当前真正存在的方法：
+    //
+    // selectUnit(unit, units)
+    //
+    // 它内部会调用：
+    // Pathfinding.getReachableHexes()
+    // --------------------------------------------------------
+
+    if (
+        typeof movementSystem.selectUnit ===
+        "function"
+    ) {
+
+        movementSystem.selectUnit(
+
+            unit,
+
+            units
+
+        );
+
+    }
+
+
+    // --------------------------------------------------------
+    // 兼容以后可能增加的新接口
+    // --------------------------------------------------------
+
+    else if (
+        typeof movementSystem.calculateReachable ===
+        "function"
+    ) {
+
+        const result =
+            movementSystem.calculateReachable(
+
+                unit,
+
+                units
+
+            );
+
+
+        if (
+            result instanceof Map
+        ) {
+
+            movementSystem.reachable =
+                result;
+
+        }
+
+    }
+
+
+    else if (
+        typeof movementSystem.computeReachable ===
+        "function"
+    ) {
+
+        const result =
+            movementSystem.computeReachable(
+
+                unit,
+
+                units
+
+            );
+
+
+        if (
+            result instanceof Map
+        ) {
+
+            movementSystem.reachable =
+                result;
+
+        }
+
+    }
+
+
+    // --------------------------------------------------------
+    // Renderer 同步
+    // --------------------------------------------------------
+
+    if (
+        typeof renderer.setReachable ===
+        "function"
+    ) {
+
+        renderer.setReachable(
+            movementSystem.reachable
+        );
+
+    }
+
+
+    // --------------------------------------------------------
+    // 调试
+    // --------------------------------------------------------
+
+    console.log(
+        "已选择单位：",
+        unit
+    );
+
+
+    console.log(
+        "单位移动点：",
+        unit.movementPoints
+    );
+
+
+    console.log(
+        "可移动格数量：",
+        movementSystem.reachable
+            instanceof Map
+
+            ? movementSystem.reachable.size
+
+            : 0
+    );
+
+
+    console.log(
+        "可移动格：",
+        movementSystem.reachable
+    );
+
+}
 
 
     let result = null;
