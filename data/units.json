@@ -356,9 +356,9 @@
 
       "r": 14,
 
-      "strength": 500,
+      "strength": 300,
 
-      "maxStrength": 500,
+      "maxStrength": 300,
 
       "attack": 8,
 
@@ -1028,9 +1028,9 @@
 
       "r": 21,
 
-      "strength": 500,
+      "strength": 300,
 
-      "maxStrength": 500,
+      "maxStrength": 300,
 
       "attack": 8,
 
@@ -1076,9 +1076,9 @@
 
       "r": 20,
 
-      "strength": 500,
+      "strength": 300,
 
-      "maxStrength": 500,
+      "maxStrength": 300,
 
       "attack": 8,
 
@@ -1748,9 +1748,9 @@
 
       "r": 15,
 
-      "strength": 500,
+      "strength": 300,
 
-      "maxStrength": 500,
+      "maxStrength": 300,
 
       "attack": 8,
 
