@@ -4748,6 +4748,38 @@ function performAttack(
 
  
 
+    // 攻击后立即同步当前被查看单位的数据与右侧信息栏。
+
+    if (selectedUnit) {
+
+        const refreshedSelected = units.find(
+
+            (u) => u === selectedUnit || (u.id && u.id === selectedUnit.id)
+
+        );
+
+ 
+
+        if (refreshedSelected && isUnitAlive(refreshedSelected)) {
+
+            selectedUnit = refreshedSelected;
+
+            showUnitInfo(refreshedSelected);
+
+        } else if (!isUnitAlive(selectedUnit)) {
+
+            clearSelection();
+
+        }
+
+    }
+
+ 
+
+    // 强制重绘，确保地图兵力标签立即反映战损。
+
+    render();
+
  
 
     if (
