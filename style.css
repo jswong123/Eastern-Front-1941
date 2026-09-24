@@ -393,3 +393,398 @@ body {
 #endPhaseButton:active {
     transform: translateY(1px);
 }
+/* ============================================================
+   战役结束弹窗
+   ============================================================ */
+
+#victory-modal {
+
+    position: fixed;
+
+    inset: 0;
+
+    z-index: 99999;
+
+}
+
+
+/* ============================================================
+   半透明战场遮罩
+   ============================================================ */
+
+.victory-overlay {
+
+    position: absolute;
+
+    inset: 0;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    padding: 30px;
+
+    background:
+        rgba(
+            20,
+            24,
+            20,
+            0.72
+        );
+
+    backdrop-filter:
+        blur(2px);
+
+}
+
+
+/* ============================================================
+   结算窗口
+   ============================================================ */
+
+.victory-window {
+
+    width: 520px;
+
+    max-width:
+        calc(
+            100vw - 60px
+        );
+
+    padding:
+        34px
+        42px
+        32px;
+
+    background:
+        #e3ddc9;
+
+    color:
+        #25251f;
+
+    border:
+        3px solid
+        #252a25;
+
+    box-shadow:
+        0
+        14px
+        45px
+        rgba(
+            0,
+            0,
+            0,
+            0.48
+        );
+
+    text-align: center;
+
+    font-family:
+        "FangSong",
+        "仿宋",
+        "SimSun",
+        serif;
+
+}
+
+
+/* ============================================================
+   顶部小标题
+   ============================================================ */
+
+.victory-decoration {
+
+    margin-bottom:
+        18px;
+
+    font-size:
+        14px;
+
+    letter-spacing:
+        5px;
+
+    color:
+        #686552;
+
+}
+
+
+/* ============================================================
+   胜利标题
+   ============================================================ */
+
+.victory-title {
+
+    margin-bottom:
+        8px;
+
+    font-size:
+        38px;
+
+    font-weight:
+        bold;
+
+    letter-spacing:
+        8px;
+
+    color:
+        #20251f;
+
+}
+
+
+/* ============================================================
+   外文标题
+   ============================================================ */
+
+.victory-subtitle {
+
+    font-size:
+        13px;
+
+    letter-spacing:
+        4px;
+
+    color:
+        #77725f;
+
+}
+
+
+/* ============================================================
+   分隔线
+   ============================================================ */
+
+.victory-line {
+
+    width:
+        72%;
+
+    height:
+        1px;
+
+    margin:
+        24px
+        auto;
+
+    background:
+        #8a846d;
+
+}
+
+
+/* ============================================================
+   胜负原因
+   ============================================================ */
+
+.victory-reason {
+
+    min-height:
+        48px;
+
+    margin-bottom:
+        22px;
+
+    font-size:
+        18px;
+
+    line-height:
+        1.8;
+
+    color:
+        #282b25;
+
+}
+
+
+/* ============================================================
+   战役信息
+   ============================================================ */
+
+.victory-details {
+
+    width:
+        82%;
+
+    margin:
+        0 auto 26px;
+
+    padding:
+        14px 0;
+
+    border-top:
+        1px solid
+        #aaa58f;
+
+    border-bottom:
+        1px solid
+        #aaa58f;
+
+}
+
+
+/* ============================================================
+   战役信息行
+   ============================================================ */
+
+.victory-detail-row {
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    justify-content:
+        space-between;
+
+    gap:
+        20px;
+
+    margin:
+        7px 0;
+
+    font-size:
+        14px;
+
+}
+
+
+.victory-detail-row span {
+
+    color:
+        #77725f;
+
+}
+
+
+.victory-detail-row strong {
+
+    color:
+        #25251f;
+
+    font-weight:
+        bold;
+
+}
+
+
+/* ============================================================
+   查看战场按钮
+   ============================================================ */
+
+.victory-button {
+
+    width:
+        190px;
+
+    padding:
+        11px
+        20px;
+
+    border:
+        1px solid
+        #20251f;
+
+    background:
+        #293029;
+
+    color:
+        #eee8d2;
+
+    font-family:
+        "FangSong",
+        "仿宋",
+        "SimSun",
+        serif;
+
+    font-size:
+        16px;
+
+    letter-spacing:
+        3px;
+
+    cursor:
+        pointer;
+
+    transition:
+        background
+        0.15s ease;
+
+}
+
+
+.victory-button:hover {
+
+    background:
+        #3a4339;
+
+}
+
+
+.victory-button:active {
+
+    transform:
+        translateY(
+            1px
+        );
+
+}
+
+
+/* ============================================================
+   战役结束后禁用按钮
+   ============================================================ */
+
+#endPhaseButton:disabled {
+
+    opacity:
+        0.45;
+
+    cursor:
+        not-allowed;
+
+}
+
+
+/* ============================================================
+   小屏幕适配
+   ============================================================ */
+
+@media (
+    max-width: 700px
+) {
+
+    .victory-window {
+
+        width:
+            100%;
+
+        padding:
+            28px
+            24px;
+
+    }
+
+
+    .victory-title {
+
+        font-size:
+            30px;
+
+        letter-spacing:
+            5px;
+
+    }
+
+
+    .victory-details {
+
+        width:
+            100%;
+
+    }
+
+}
