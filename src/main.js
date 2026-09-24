@@ -1296,91 +1296,38 @@ function getPlayerSide() {
 
 function isUnitAlive(unit) {
 
- 
-
- 
-
- 
-
     if (!unit) {
-
- 
-
         return false;
-
- 
-
- 
-
- 
-
     }
 
- 
+    if (unit.destroyed === true) {
+        return false;
+    }
 
- 
+    const strength =
+        Number(unit.strength);
 
- 
+    const manpower =
+        Number(unit.manpower);
 
- 
+    // 任意一个有效兵力字段 <= 0，都视为阵亡
+    if (
+        Number.isFinite(strength) &&
+        strength <= 0
+    ) {
+        return false;
+    }
 
- 
+    if (
+        Number.isFinite(manpower) &&
+        manpower <= 0
+    ) {
+        return false;
+    }
 
-    return (
-
- 
-
- 
-
- 
-
-        unit.destroyed !== true &&
-
- 
-
- 
-
- 
-
-        Number(
-
- 
-
-            unit.manpower ??
-
- 
-
-            unit.strength ?? 100
-
- 
-
-        ) > 0
-
- 
-
- 
-
- 
-
-    );
-
- 
-
- 
-
- 
-
+    return true;
 }
 
- 
-
- 
-
- 
-
- 
-
- 
 
 // ============================================================
 
@@ -8328,211 +8275,96 @@ function writeBattleMessage(
 
 function removeDestroyedUnits() {
 
- 
+    for (const unit of units) {
 
- 
-
- 
-
-    for (
-
- 
-
-        const unit
-
- 
-
-        of units
-
- 
-
-    ) {
-
- 
-
- 
-
- 
-
-        if (
-
- 
-
-            unit.destroyed ||
-
- 
-
-            getUnitStrength(unit) <= 0
-
- 
-
-        ) {
-
- 
-
- 
-
- 
-
-            unit.strength = 0;
-
- 
-
- 
-
- 
-
-            unit.destroyed = true;
-
- 
-
- 
-
- 
-
-            unit.movementPoints = 0;
-
- 
-
- 
-
- 
-
-            unit.hasAttacked = true;
-
- 
-
- 
-
- 
-
- 
-
- 
-
-            if (
-
- 
-
-                selectedUnit ===
-
- 
-
-                unit
-
- 
-
-            ) {
-
- 
-
- 
-
- 
-
-                selectedUnit =
-
- 
-
- 
-
- 
-
-                    null;
-
- 
-
- 
-
- 
-
-            }
-
- 
-
- 
-
- 
-
+        if (!unit) {
+            continue;
         }
 
- 
+        // --------------------------------------------------------
+        // 同时读取 strength / manpower
+        //
+        // CombatSystem 的不同版本可能修改其中任意一个字段，
+        // 因此不能再只依赖 manpower ?? strength。
+        // --------------------------------------------------------
 
- 
+        const strengthValue =
+            Number(unit.strength);
 
- 
+        const manpowerValue =
+            Number(unit.manpower);
 
- 
+        const strengthDead =
+            Number.isFinite(strengthValue) &&
+            strengthValue <= 0;
 
- 
+        const manpowerDead =
+            Number.isFinite(manpowerValue) &&
+            manpowerValue <= 0;
 
+        // --------------------------------------------------------
+        // 任意一套兵力系统确认单位死亡，就统一判定阵亡
+        // --------------------------------------------------------
+
+        const dead =
+            unit.destroyed === true ||
+            strengthDead ||
+            manpowerDead;
+
+        if (!dead) {
+            continue;
+        }
+
+        // --------------------------------------------------------
+        // 统一死亡状态
+        // --------------------------------------------------------
+
+        unit.strength = 0;
+        unit.manpower = 0;
+        unit.destroyed = true;
+        unit.movementPoints = 0;
+        unit.actionPoints = 0;
+        unit.hasAttacked = true;
+
+        console.log(
+            `[单位系统] ${unit.id} 已被消灭，停止显示与行动`
+        );
+
+        // --------------------------------------------------------
+        // 如果当前选中的正好是阵亡单位
+        // --------------------------------------------------------
+
+        if (
+            selectedUnit === unit ||
+            (
+                selectedUnit?.id &&
+                unit.id &&
+                selectedUnit.id === unit.id
+            )
+        ) {
+            selectedUnit = null;
+        }
     }
 
- 
-
- 
-
- 
-
- 
-
- 
+    // ------------------------------------------------------------
+    // 清除死亡单位选择状态
+    // ------------------------------------------------------------
 
     if (
-
- 
-
         selectedUnit &&
-
- 
-
-        !isUnitAlive(
-
- 
-
-            selectedUnit
-
- 
-
-        )
-
- 
-
+        !isUnitAlive(selectedUnit)
     ) {
-
- 
-
- 
-
- 
-
         clearSelection();
-
- 
-
- 
-
- 
-
     }
 
- 
+    // ------------------------------------------------------------
+    // 阵亡单位继续保留在 units 中。
+    // VictorySystem 的 HQ 全灭判定仍然需要这些数据。
+    // ------------------------------------------------------------
 
- 
-
- 
-
+    gameState.units = units;
 }
 
- 
-
- 
-
- 
-
- 
-
- 
 
 // ============================================================
 
@@ -13625,7 +13457,7 @@ canvas.addEventListener(
  
 
         }
-
+     
  
 
  
@@ -15923,5 +15755,6 @@ resizeCanvas();
  
 
  
+
 
 loadScenario();
