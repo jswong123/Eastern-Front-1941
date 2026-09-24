@@ -3158,127 +3158,21 @@ function normalizeUnit(rawUnit) {
 
  
 
-    const strength =
+ const strength =
+    Number(
+        rawUnit.strength ??
+        rawUnit.manpower ??
+        100
+    );
 
- 
-
- 
-
- 
-
-        Number(
-
- 
-
- 
-
- 
-
-            rawUnit.manpower ??
-
- 
-
- 
-
- 
-
-            rawUnit.strength ??
-
- 
-
- 
-
- 
-
-            100
-
- 
-
- 
-
- 
-
-        );
-
- 
-
- 
-
- 
-
- 
-
- 
-
- 
-
- 
-
- 
-
- 
-
- 
-
- 
-
-    const maxStrength =
-
- 
-
- 
-
- 
-
-        Number(
-
- 
-
- 
-
- 
-
-            rawUnit.maxManpower ??
-
- 
-
- 
-
- 
-
-            rawUnit.maxStrength ??
-
- 
-
- 
-
- 
-
-            rawUnit.manpower ??
-
- 
-
- 
-
- 
-
-            rawUnit.strength ??
-
- 
-
- 
-
- 
-
-            100
-
- 
-
- 
-
- 
-
-        );
+const maxStrength =
+    Number(
+        rawUnit.maxStrength ??
+        rawUnit.maxManpower ??
+        rawUnit.strength ??
+        rawUnit.manpower ??
+        100
+    );
 
  
 
