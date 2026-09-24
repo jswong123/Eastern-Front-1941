@@ -1,24 +1,24 @@
 // ========================================
 // UnitSelection.js
 //
-// 单位选择系统
 // 东线 1941
+// 单位选择系统
 //
 // 功能：
-// 1. 点击单位
-// 2. 玩家单位选择
-// 3. 敌军单位查看
-// 4. 死亡单位过滤
-// 5. 点击判定
-// 6. 与 Renderer / GameState 兼容
+// 1. 点击选择单位
+// 2. 玩家单位可以操作
+// 3. 敌军单位可以查看
+// 4. 死亡单位不可选择
+// 5. 兵力为 0 的单位不可选择
+// 6. 支持六角格单位查找
 // ========================================
 
 
 export class UnitSelection {
 
     constructor(
-        renderer,
-        gameState
+        renderer = null,
+        gameState = null
     ) {
 
         this.renderer =
@@ -28,44 +28,54 @@ export class UnitSelection {
             gameState;
 
 
-        // ========================================
-        // 当前选择单位
-        // ========================================
+        // 当前真正被选择、
+        // 可以进行移动/攻击的单位
 
         this.selectedUnit =
             null;
 
 
-        // ========================================
-        // 当前查看单位
-        //
-        // 玩家点击敌军时：
-        // inspectedUnit = 敌军
-        // selectedUnit = null
-        // ========================================
+        // 当前查看的单位
+        // 包括敌军
 
         this.inspectedUnit =
             null;
 
 
-        // ========================================
-        // 点击判定尺寸
-        //
-        // 这是基础尺寸。
-        // 实际判定还会考虑 camera.zoom。
-        // ========================================
+        // 当前鼠标对应的 Hex
 
-        this.hitWidth =
-            50;
-
-        this.hitHeight =
-            40;
+        this.hoveredHex =
+            null;
 
     }
 
 
     // ========================================
-    // 判断单位是否仍然存活
+    // 设置 Renderer
+    // ========================================
+
+    setRenderer(renderer) {
+
+        this.renderer =
+            renderer;
+
+    }
+
+
+    // ========================================
+    // 设置 GameState
+    // ========================================
+
+    setGameState(gameState) {
+
+        this.gameState =
+            gameState;
+
+    }
+
+
+    // ========================================
+    // 判断单位是否存活
     // ========================================
 
     isUnitAlive(unit) {
@@ -89,13 +99,22 @@ export class UnitSelection {
         const strength =
             Number(
                 unit.strength ??
-                unit.maxStrength ??
                 100
             );
 
 
+        if (
+            !Number.isFinite(
+                strength
+            )
+        ) {
+
+            return false;
+
+        }
+
+
         return (
-            Number.isFinite(strength) &&
             strength > 0
         );
 
@@ -103,7 +122,7 @@ export class UnitSelection {
 
 
     // ========================================
-    // 获取当前玩家阵营
+    // 获取玩家阵营
     // ========================================
 
     getPlayerFaction() {
@@ -115,16 +134,13 @@ export class UnitSelection {
         }
 
 
-        /*
-         * 项目不同版本中曾使用过不同字段。
-         * 这里全部兼容。
-         */
-
         return (
 
             this.gameState.playerFaction ??
 
             this.gameState.controlledFaction ??
+
+            this.gameState.currentPlayerFaction ??
 
             this.gameState.faction ??
 
@@ -153,11 +169,12 @@ export class UnitSelection {
 
 
         /*
-         * 如果 GameState 尚未设置玩家阵营，
-         * 不在 UnitSelection 层强行禁止选择。
+         * 初始化阶段如果玩家阵营
+         * 尚未写入 GameState，
+         * 暂时允许选择。
          *
-         * 这样可以避免初始化阶段所有单位
-         * 都突然无法点击。
+         * 避免出现：
+         * 所有单位都无法选择。
          */
 
         if (!playerFaction) {
@@ -176,541 +193,12 @@ export class UnitSelection {
 
 
     // ========================================
-    // 获取 Camera
+    // 根据 Hex 查找单位
     // ========================================
 
-    getCamera() {
-
-        return (
-            this.renderer?.camera ??
-            null
-        );
-
-    }
-
-
-    // ========================================
-    // 获取 Hex 尺寸
-    // ========================================
-
-    getHexSize() {
-
-        const renderer =
-            this.renderer;
-
-
-        if (!renderer) {
-
-            return 32;
-
-        }
-
-
-        return (
-
-            renderer.hexSize ??
-
-            renderer.size ??
-
-            renderer.world?.hexSize ??
-
-            32
-
-        );
-
-    }
-
-
-    // ========================================
-    // 六角格 → 世界坐标
-    //
-    // 优先调用 Renderer 已有方法。
-    // 如果 Renderer 没有，则使用 fallback。
-    // ========================================
-
-    getWorldPosition(unit) {
-
-        if (!unit) {
-
-            return null;
-
-        }
-
-
-        const renderer =
-            this.renderer;
-
-
-        // ========================================
-        // Renderer API 1
-        // ========================================
-
-        if (
-            renderer &&
-            typeof renderer.hexToPixel ===
-                "function"
-        ) {
-
-            const p =
-                renderer.hexToPixel(
-                    unit.q,
-                    unit.r
-                );
-
-
-            if (
-                p &&
-                Number.isFinite(p.x) &&
-                Number.isFinite(p.y)
-            ) {
-
-                return p;
-
-            }
-
-        }
-
-
-        // ========================================
-        // Renderer API 2
-        // ========================================
-
-        if (
-            renderer &&
-            typeof renderer.getHexCenter ===
-                "function"
-        ) {
-
-            const p =
-                renderer.getHexCenter(
-                    unit.q,
-                    unit.r
-                );
-
-
-            if (
-                p &&
-                Number.isFinite(p.x) &&
-                Number.isFinite(p.y)
-            ) {
-
-                return p;
-
-            }
-
-        }
-
-
-        // ========================================
-        // Renderer API 3
-        // ========================================
-
-        if (
-            renderer &&
-            typeof renderer.hexCenter ===
-                "function"
-        ) {
-
-            const p =
-                renderer.hexCenter(
-                    unit.q,
-                    unit.r
-                );
-
-
-            if (
-                p &&
-                Number.isFinite(p.x) &&
-                Number.isFinite(p.y)
-            ) {
-
-                return p;
-
-            }
-
-        }
-
-
-        // ========================================
-        // Fallback
-        //
-        // Pointy-top axial hex
-        // ========================================
-
-        const size =
-            this.getHexSize();
-
-
-        const q =
-            Number(unit.q);
-
-
-        const r =
-            Number(unit.r);
-
-
-        if (
-            !Number.isFinite(q) ||
-            !Number.isFinite(r)
-        ) {
-
-            return null;
-
-        }
-
-
-        const x =
-            size *
-            Math.sqrt(3) *
-            (
-                q +
-                r / 2
-            );
-
-
-        const y =
-            size *
-            1.5 *
-            r;
-
-
-        return {
-            x,
-            y
-        };
-
-    }
-
-
-    // ========================================
-    // 世界坐标 → 屏幕坐标
-    // ========================================
-
-    worldToScreen(
-        worldX,
-        worldY
-    ) {
-
-        const camera =
-            this.getCamera();
-
-
-        if (!camera) {
-
-            return {
-
-                x: worldX,
-
-                y: worldY
-
-            };
-
-        }
-
-
-        // ========================================
-        // 优先使用 Camera 自己的方法
-        // ========================================
-
-        if (
-            typeof camera.worldToScreen ===
-                "function"
-        ) {
-
-            const p =
-                camera.worldToScreen(
-                    worldX,
-                    worldY
-                );
-
-
-            if (
-                p &&
-                Number.isFinite(p.x) &&
-                Number.isFinite(p.y)
-            ) {
-
-                return p;
-
-            }
-
-        }
-
-
-        // ========================================
-        // 通用 Camera fallback
-        // ========================================
-
-        const zoom =
-            Number(
-                camera.zoom ??
-                1
-            ) || 1;
-
-
-        const cameraX =
-            Number(
-                camera.x ??
-                camera.offsetX ??
-                0
-            ) || 0;
-
-
-        const cameraY =
-            Number(
-                camera.y ??
-                camera.offsetY ??
-                0
-            ) || 0;
-
-
-        return {
-
-            x:
-                (
-                    worldX -
-                    cameraX
-                ) *
-                zoom,
-
-            y:
-                (
-                    worldY -
-                    cameraY
-                ) *
-                zoom
-
-        };
-
-    }
-
-
-    // ========================================
-    // 获取单位屏幕位置
-    // ========================================
-
-    getUnitScreenPosition(unit) {
-
-        if (!unit) {
-
-            return null;
-
-        }
-
-
-        const renderer =
-            this.renderer;
-
-
-        // ========================================
-        // 如果 Renderer 已经提供完整转换，
-        // 优先使用 Renderer。
-        // ========================================
-
-        if (
-            renderer &&
-            typeof renderer.getUnitScreenPosition ===
-                "function"
-        ) {
-
-            const rendererPosition =
-                renderer.getUnitScreenPosition(
-                    unit
-                );
-
-
-            if (
-                rendererPosition &&
-                Number.isFinite(
-                    rendererPosition.x
-                ) &&
-                Number.isFinite(
-                    rendererPosition.y
-                )
-            ) {
-
-                return rendererPosition;
-
-            }
-
-        }
-
-
-        // ========================================
-        // 否则自己计算
-        // ========================================
-
-        const worldPosition =
-            this.getWorldPosition(
-                unit
-            );
-
-
-        if (!worldPosition) {
-
-            return null;
-
-        }
-
-
-        return this.worldToScreen(
-
-            worldPosition.x,
-
-            worldPosition.y
-
-        );
-
-    }
-
-
-    // ========================================
-    // 计算点击范围
-    // ========================================
-
-    getHitBox(unit) {
-
-        const p =
-            this.getUnitScreenPosition(
-                unit
-            );
-
-
-        if (!p) {
-
-            return null;
-
-        }
-
-
-        const camera =
-            this.getCamera();
-
-
-        const zoom =
-            Math.max(
-                0.1,
-                Number(
-                    camera?.zoom ??
-                    1
-                ) || 1
-            );
-
-
-        /*
-         * 不让缩小时点击区域变得过小。
-         *
-         * 大地图缩小时仍然能够比较容易
-         * 点击单位。
-         */
-
-        const width =
-            Math.max(
-                30,
-                this.hitWidth *
-                zoom
-            );
-
-
-        const height =
-            Math.max(
-                24,
-                this.hitHeight *
-                zoom
-            );
-
-
-        return {
-
-            left:
-                p.x -
-                width / 2,
-
-            right:
-                p.x +
-                width / 2,
-
-            top:
-                p.y -
-                height / 2,
-
-            bottom:
-                p.y +
-                height / 2,
-
-            centerX:
-                p.x,
-
-            centerY:
-                p.y,
-
-            width,
-
-            height
-
-        };
-
-    }
-
-
-    // ========================================
-    // 鼠标是否点击某个单位
-    // ========================================
-
-    hitTest(
-        unit,
-        mouseX,
-        mouseY
-    ) {
-
-        if (
-            !this.isUnitAlive(unit)
-        ) {
-
-            return false;
-
-        }
-
-
-        const box =
-            this.getHitBox(
-                unit
-            );
-
-
-        if (!box) {
-
-            return false;
-
-        }
-
-
-        return (
-
-            mouseX >=
-                box.left &&
-
-            mouseX <=
-                box.right &&
-
-            mouseY >=
-                box.top &&
-
-            mouseY <=
-                box.bottom
-
-        );
-
-    }
-
-
-    // ========================================
-    // 根据鼠标位置寻找单位
-    // ========================================
-
-    findUnitAtScreenPosition(
-        mouseX,
-        mouseY,
+    getUnitAtHex(
+        q,
+        r,
         units = []
     ) {
 
@@ -723,13 +211,6 @@ export class UnitSelection {
         }
 
 
-        /*
-         * 从数组后面开始。
-         *
-         * Renderer 通常后绘制的单位
-         * 位于视觉上层。
-         */
-
         for (
             let i =
                 units.length - 1;
@@ -741,51 +222,23 @@ export class UnitSelection {
                 units[i];
 
 
-            // ========================================
-            // 无效 / 死亡单位直接跳过
-            // ========================================
-
             if (
-                !this.isUnitAlive(unit)
-            ) {
-
-                continue;
-
-            }
-
-
-            // ========================================
-            // 必须有地图坐标
-            // ========================================
-
-            const q =
-                Number(unit.q);
-
-
-            const r =
-                Number(unit.r);
-
-
-            if (
-                !Number.isFinite(q) ||
-                !Number.isFinite(r)
-            ) {
-
-                continue;
-
-            }
-
-
-            // ========================================
-            // 点击检测
-            // ========================================
-
-            if (
-                this.hitTest(
-                    unit,
-                    mouseX,
-                    mouseY
+                !this.isUnitAlive(
+                    unit
                 )
+            ) {
+
+                continue;
+
+            }
+
+
+            if (
+                Number(unit.q) ===
+                    Number(q) &&
+
+                Number(unit.r) ===
+                    Number(r)
             ) {
 
                 return unit;
@@ -801,20 +254,21 @@ export class UnitSelection {
 
 
     // ========================================
-    // 兼容旧名称
+    // 别名：
+    // 部分旧 main.js 可能使用 findUnitAtHex
     // ========================================
 
-    findUnitAt(
-        mouseX,
-        mouseY,
+    findUnitAtHex(
+        q,
+        r,
         units = []
     ) {
 
-        return this.findUnitAtScreenPosition(
+        return this.getUnitAtHex(
 
-            mouseX,
+            q,
 
-            mouseY,
+            r,
 
             units
 
@@ -824,36 +278,85 @@ export class UnitSelection {
 
 
     // ========================================
-    // 兼容旧名称
+    // 检查 Hex 是否被占据
     // ========================================
 
-    getUnitAtScreenPosition(
-        mouseX,
-        mouseY,
-        units = []
+    isHexOccupied(
+        q,
+        r,
+        units = [],
+        ignoredUnit = null
     ) {
 
-        return this.findUnitAtScreenPosition(
+        if (
+            !Array.isArray(units)
+        ) {
 
-            mouseX,
+            return false;
 
-            mouseY,
+        }
 
-            units
 
-        );
+        for (
+            const unit
+            of units
+        ) {
+
+            if (
+                unit ===
+                ignoredUnit
+            ) {
+
+                continue;
+
+            }
+
+
+            if (
+                !this.isUnitAlive(
+                    unit
+                )
+            ) {
+
+                continue;
+
+            }
+
+
+            if (
+                Number(unit.q) ===
+                    Number(q) &&
+
+                Number(unit.r) ===
+                    Number(r)
+            ) {
+
+                return true;
+
+            }
+
+        }
+
+
+        return false;
 
     }
 
 
     // ========================================
-    // 选择玩家单位
+    // 选择单位
     // ========================================
 
     selectUnit(unit) {
 
+        // ========================================
+        // 无效 / 死亡单位
+        // ========================================
+
         if (
-            !this.isUnitAlive(unit)
+            !this.isUnitAlive(
+                unit
+            )
         ) {
 
             this.clearSelection();
@@ -864,19 +367,27 @@ export class UnitSelection {
 
 
         // ========================================
-        // 敌方单位只能查看
+        // 当前查看单位
+        // ========================================
+
+        this.inspectedUnit =
+            unit;
+
+
+        // ========================================
+        // 敌军：
+        // 可以查看
+        // 不能作为玩家操作单位
         // ========================================
 
         if (
-            !this.isPlayerUnit(unit)
+            !this.isPlayerUnit(
+                unit
+            )
         ) {
 
             this.selectedUnit =
                 null;
-
-
-            this.inspectedUnit =
-                unit;
 
 
             return unit;
@@ -892,31 +403,27 @@ export class UnitSelection {
             unit;
 
 
-        this.inspectedUnit =
-            unit;
-
-
         return unit;
 
     }
 
 
     // ========================================
-    // 点击选择
+    // 通过 Hex 选择单位
     // ========================================
 
-    selectAt(
-        mouseX,
-        mouseY,
+    selectHex(
+        q,
+        r,
         units = []
     ) {
 
         const unit =
-            this.findUnitAtScreenPosition(
+            this.getUnitAtHex(
 
-                mouseX,
+                q,
 
-                mouseY,
+                r,
 
                 units
 
@@ -940,20 +447,20 @@ export class UnitSelection {
 
 
     // ========================================
-    // 兼容旧版 select
+    // 兼容接口
     // ========================================
 
-    select(
-        mouseX,
-        mouseY,
+    selectAtHex(
+        q,
+        r,
         units = []
     ) {
 
-        return this.selectAt(
+        return this.selectHex(
 
-            mouseX,
+            q,
 
-            mouseY,
+            r,
 
             units
 
@@ -963,7 +470,7 @@ export class UnitSelection {
 
 
     // ========================================
-    // 设置选择单位
+    // 设置 selectedUnit
     // ========================================
 
     setSelectedUnit(unit) {
@@ -976,12 +483,13 @@ export class UnitSelection {
 
 
     // ========================================
-    // 获取当前玩家操作单位
+    // 获取当前选择单位
     // ========================================
 
     getSelectedUnit() {
 
         if (
+            this.selectedUnit &&
             !this.isUnitAlive(
                 this.selectedUnit
             )
@@ -1005,6 +513,7 @@ export class UnitSelection {
     getInspectedUnit() {
 
         if (
+            this.inspectedUnit &&
             !this.isUnitAlive(
                 this.inspectedUnit
             )
@@ -1022,7 +531,7 @@ export class UnitSelection {
 
 
     // ========================================
-    // 是否存在选择
+    // 是否存在玩家选择
     // ========================================
 
     hasSelection() {
@@ -1036,21 +545,7 @@ export class UnitSelection {
 
 
     // ========================================
-    // 是否正在查看单位
-    // ========================================
-
-    hasInspectedUnit() {
-
-        return (
-            this.getInspectedUnit() !==
-            null
-        );
-
-    }
-
-
-    // ========================================
-    // 清除选择
+    // 清除所有选择
     // ========================================
 
     clearSelection() {
@@ -1058,15 +553,17 @@ export class UnitSelection {
         this.selectedUnit =
             null;
 
-
         this.inspectedUnit =
+            null;
+
+        this.hoveredHex =
             null;
 
     }
 
 
     // ========================================
-    // 兼容旧名称
+    // 兼容旧版 clear()
     // ========================================
 
     clear() {
@@ -1077,9 +574,7 @@ export class UnitSelection {
 
 
     // ========================================
-    // 取消玩家操作选择
-    //
-    // 但可以继续保留查看目标。
+    // 只取消操作单位
     // ========================================
 
     clearSelectedUnit() {
@@ -1091,9 +586,41 @@ export class UnitSelection {
 
 
     // ========================================
-    // 清理已经死亡的选择目标
-    //
-    // 每次战斗后可以调用。
+    // 设置当前 Hover Hex
+    // ========================================
+
+    setHoveredHex(
+        q,
+        r
+    ) {
+
+        this.hoveredHex = {
+
+            q:
+                Number(q),
+
+            r:
+                Number(r)
+
+        };
+
+    }
+
+
+    // ========================================
+    // 清除 Hover
+    // ========================================
+
+    clearHoveredHex() {
+
+        this.hoveredHex =
+            null;
+
+    }
+
+
+    // ========================================
+    // 清理死亡选择
     // ========================================
 
     cleanupDeadSelection() {
@@ -1127,14 +654,12 @@ export class UnitSelection {
 
 
     // ========================================
-    // 从单位数组中删除死亡单位
+    // 删除 units 数组中的死亡单位
     //
-    // 注意：
-    // 这个函数会直接修改 units 数组。
+    // strength <= 0
+    // 或 destroyed === true
     //
-    // 推荐战斗完成后调用：
-    //
-    // selection.removeDestroyedUnits(units);
+    // 都会真正从数组删除
     // ========================================
 
     removeDestroyedUnits(
@@ -1166,18 +691,23 @@ export class UnitSelection {
 
 
             if (
-                !this.isUnitAlive(unit)
+                this.isUnitAlive(
+                    unit
+                )
             ) {
 
-                units.splice(
-                    i,
-                    1
-                );
-
-
-                removed++;
+                continue;
 
             }
+
+
+            units.splice(
+                i,
+                1
+            );
+
+
+            removed++;
 
         }
 
@@ -1191,72 +721,24 @@ export class UnitSelection {
 
 
     // ========================================
-    // 检查某个 Hex 是否存在单位
-    //
-    // 可供 main.js / MovementSystem 调试使用。
+    // 获取某阵营存活单位
     // ========================================
 
-    getUnitAtHex(
-        q,
-        r,
-        units = []
-    ) {
-
-        if (
-            !Array.isArray(units)
-        ) {
-
-            return null;
-
-        }
-
-
-        return (
-
-            units.find(
-
-                unit =>
-
-                    this.isUnitAlive(
-                        unit
-                    ) &&
-
-                    Number(unit.q) ===
-                        Number(q) &&
-
-                    Number(unit.r) ===
-                        Number(r)
-
-            ) ??
-
-            null
-
-        );
-
-    }
-
-
-    // ========================================
-    // Hex 是否被占据
-    // ========================================
-
-    isHexOccupied(
-        q,
-        r,
+    getAliveUnits(
         units = [],
-        ignoredUnit = null
+        faction = null
     ) {
 
         if (
             !Array.isArray(units)
         ) {
 
-            return false;
+            return [];
 
         }
 
 
-        return units.some(
+        return units.filter(
 
             unit => {
 
@@ -1272,24 +754,17 @@ export class UnitSelection {
 
 
                 if (
-                    ignoredUnit &&
-                    unit ===
-                        ignoredUnit
+                    faction === null
                 ) {
 
-                    return false;
+                    return true;
 
                 }
 
 
                 return (
-
-                    Number(unit.q) ===
-                        Number(q) &&
-
-                    Number(unit.r) ===
-                        Number(r)
-
+                    unit.faction ===
+                    faction
                 );
 
             }
@@ -1300,24 +775,76 @@ export class UnitSelection {
 
 
     // ========================================
-    // Debug
+    // 获取玩家存活单位
     // ========================================
 
-    debugSelection() {
+    getPlayerUnits(
+        units = []
+    ) {
+
+        const faction =
+            this.getPlayerFaction();
+
+
+        if (!faction) {
+
+            return this.getAliveUnits(
+                units
+            );
+
+        }
+
+
+        return this.getAliveUnits(
+
+            units,
+
+            faction
+
+        );
+
+    }
+
+
+    // ========================================
+    // 检查选择状态
+    //
+    // 每次 render 前调用也没问题
+    // ========================================
+
+    update() {
+
+        this.cleanupDeadSelection();
+
+    }
+
+
+    // ========================================
+    // 调试信息
+    // ========================================
+
+    debug() {
 
         console.log(
             "[UnitSelection]",
             {
+
                 playerFaction:
                     this.getPlayerFaction(),
 
                 selectedUnit:
-                    this.selectedUnit?.id ??
+                    this.selectedUnit
+                        ?.id ??
                     null,
 
                 inspectedUnit:
-                    this.inspectedUnit?.id ??
-                    null
+                    this.inspectedUnit
+                        ?.id ??
+                    null,
+
+                hoveredHex:
+                    this.hoveredHex
+
             }
         );
 
