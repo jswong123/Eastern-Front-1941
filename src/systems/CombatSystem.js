@@ -26,7 +26,38 @@ export class CombatSystem {
         this.world = world;
 
     }
+// ========================================
+// 初始化单位战斗状态
+// ========================================
 
+initializeUnit(unit) {
+
+    if (!unit) {
+        return;
+    }
+
+    if (unit.maxStrength === undefined) {
+
+        unit.maxStrength =
+            unit.strength ?? 100;
+
+    }
+
+    if (unit.strength === undefined) {
+
+        unit.strength =
+            unit.maxStrength;
+
+    }
+
+    if (unit.strength <= 0) {
+
+        unit.strength = 0;
+        unit.destroyed = true;
+
+    }
+
+}
 
     // ========================================
     // 六角格距离
@@ -933,21 +964,20 @@ export class CombatSystem {
     // ========================================
 
     attack(
-        attacker,
-        defender
+    attacker,
+    defender
+) {
+
+    this.initializeUnit(attacker);
+    this.initializeUnit(defender);
+
+
+    if (
+        !this.canAttack(
+            attacker,
+            defender
+        )
     ) {
-
-        // ------------------------------------
-        // 攻击合法性检查
-        // ------------------------------------
-
-        if (
-            !this.canAttack(
-                attacker,
-                defender
-            )
-        ) {
-
             return {
 
                 success: false,
