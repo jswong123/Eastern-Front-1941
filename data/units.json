@@ -2122,7 +2122,7 @@
 
       "id": "GER_HQ_02",
 
-      "name": "第2司令部",
+      "name": "司令部警卫连",
 
       "faction": "german",
 
@@ -2136,7 +2136,7 @@
 
       "maxStrength": 120,
 
-      "attack": 2,
+      "attack": 4,
 
       "defense": 3,
 
@@ -2842,7 +2842,7 @@
 
       "id": "SOV_HQ_02",
 
-      "name": "第2司令部",
+      "name": "司令部警卫连",
 
       "faction": "soviet",
 
@@ -2856,7 +2856,7 @@
 
       "maxStrength": 120,
 
-      "attack": 2,
+      "attack": 4,
 
       "defense": 3,
 
