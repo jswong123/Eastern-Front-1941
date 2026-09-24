@@ -43,6 +43,7 @@ export function drawHexPath(ctx, x, y, size) {
     ctx.closePath();
 
 }
+
 // ========================================
 // 屏幕/世界坐标 -> 最近 Hex
 // ========================================
@@ -88,6 +89,7 @@ export function pixelToHex(
 function axialRound(
     q,
     r
+
 ) {
 
     const x = q;
@@ -134,6 +136,7 @@ function axialRound(
         rx =
             -ry - rz;
 
+
     }
 
     else if (
@@ -178,6 +181,7 @@ export function hexDistance(
             a.q - b.q
         )
         +
+
         Math.abs(
             a.q +
             a.r -
@@ -189,5 +193,3 @@ export function hexDistance(
             a.r - b.r
         )
     ) / 2;
-
-}
