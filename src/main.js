@@ -28,7 +28,153 @@ import { CombatSystem } from "./systems/CombatSystem.js";
 import { AISystem } from "./systems/AISystem.js";
 
 import { pixelToHex } from "./Hex.js";
+// ============================================================
+// 单位数据加载
+// ============================================================
 
+async function loadUnitsFromJSON() {
+
+    try {
+
+        const response =
+            await fetch("./data/units.json");
+
+        if (!response.ok) {
+
+            throw new Error(
+                `units.json 加载失败：HTTP ${response.status}`
+            );
+
+        }
+
+        const data =
+            await response.json();
+
+
+        if (
+            !data ||
+            !Array.isArray(data.units)
+        ) {
+
+            throw new Error(
+                "units.json 格式错误：缺少 units 数组"
+            );
+
+        }
+
+
+        const units =
+            data.units.map(unit => ({
+
+                ...unit,
+
+                // ----------------------------
+                // 基础兵力
+                // ----------------------------
+
+                strength:
+                    unit.strength ?? 100,
+
+                maxStrength:
+                    unit.maxStrength ??
+                    unit.strength ??
+                    100,
+
+
+                // ----------------------------
+                // 战斗状态
+                // ----------------------------
+
+                destroyed: false,
+
+                hasAttacked: false,
+
+
+                // ----------------------------
+                // 移动状态
+                // ----------------------------
+
+                movement:
+                    unit.movement ?? 4,
+
+                movementPoints:
+                    unit.movement ?? 4,
+
+
+                // ----------------------------
+                // 战斗属性
+                // ----------------------------
+
+                attack:
+                    unit.attack ?? 5,
+
+                defense:
+                    unit.defense ?? 5,
+
+                range:
+                    unit.range ?? 1,
+
+
+                // ----------------------------
+                // 后续系统预留
+                // ----------------------------
+
+                morale:
+                    unit.morale ?? 100,
+
+                suppression:
+                    unit.suppression ?? 0,
+
+                fatigue:
+                    unit.fatigue ?? 0,
+
+                ammo:
+                    unit.ammo ?? 100
+
+            }));
+
+
+        console.log(
+            `[单位系统] units.json 加载成功：${units.length} 个单位`
+        );
+
+
+        console.log(
+            `[单位系统] 德军：${
+                units.filter(
+                    unit =>
+                        unit.faction === "german"
+                ).length
+            }`
+        );
+
+
+        console.log(
+            `[单位系统] 苏军：${
+                units.filter(
+                    unit =>
+                        unit.faction === "soviet"
+                ).length
+            }`
+        );
+
+
+        return units;
+
+    }
+
+    catch (error) {
+
+        console.error(
+            "[单位系统] units.json 加载失败：",
+            error
+        );
+
+        return [];
+
+    }
+
+}
 
 // ============================================================
 // DOM
