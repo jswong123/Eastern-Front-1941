@@ -1134,27 +1134,45 @@ export class Renderer {
     // 绘制单位
     // ========================================================
 
-    drawUnits(
-        units = []
+   drawUnits(
+    units = []
+) {
+
+    const ctx =
+        this.ctx;
+
+    for (
+        const unit
+        of units
     ) {
 
-        const ctx =
-            this.ctx;
+        // ========================================
+        // 不绘制已经被消灭的单位
+        // ========================================
 
-
-        for (
-            const unit
-            of units
+        if (
+            !unit ||
+            unit.destroyed === true ||
+            Number(unit.strength ?? 0) <= 0
         ) {
 
-            if (
-                unit.q === undefined ||
-                unit.r === undefined
-            ) {
+            continue;
 
-                continue;
+        }
 
-            }
+
+        // ========================================
+        // 没有有效地图坐标
+        // ========================================
+
+        if (
+            unit.q === undefined ||
+            unit.r === undefined
+        ) {
+
+            continue;
+
+        }
 
 
             const p =
