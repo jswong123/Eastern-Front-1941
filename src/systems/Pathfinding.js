@@ -2,6 +2,13 @@
 // Pathfinding.js
 //
 // 六角格寻路系统
+//
+// V0.5 单位占格规则：
+// 1. 一个六角格只能存在一个存活单位
+// 2. 己方单位占据的格子不可进入
+// 3. 敌方单位占据的格子不可进入
+// 4. 存活单位同时构成寻路障碍
+// 5. destroyed 或 strength <= 0 的单位不占格
 // ========================================
 
 
@@ -73,6 +80,191 @@ export class Pathfinding {
 
 
     // ========================================
+    // 判断单位是否存活
+    // ========================================
+
+    isUnitAlive(unit) {
+
+        if (!unit) {
+
+            return false;
+
+        }
+
+
+        if (
+            unit.destroyed === true
+        ) {
+
+            return false;
+
+        }
+
+
+        if (
+            Number(
+                unit.strength ?? 100
+            ) <= 0
+        ) {
+
+            return false;
+
+        }
+
+
+        return true;
+
+    }
+
+
+    // ========================================
+    // 判断 Hex 是否被单位占据
+    // ========================================
+
+    isHexOccupied(
+        q,
+        r,
+        units = [],
+        movingUnit = null
+    ) {
+
+        if (
+            !Array.isArray(units)
+        ) {
+
+            return false;
+
+        }
+
+
+        return units.some(
+            unit => {
+
+                // ----------------------------
+                // 空单位忽略
+                // ----------------------------
+
+                if (!unit) {
+
+                    return false;
+
+                }
+
+
+                // ----------------------------
+                // 忽略正在寻路的单位自己
+                // ----------------------------
+
+                if (
+                    unit ===
+                    movingUnit
+                ) {
+
+                    return false;
+
+                }
+
+
+                // ----------------------------
+                // 死亡单位不占格
+                // ----------------------------
+
+                if (
+                    !this.isUnitAlive(
+                        unit
+                    )
+                ) {
+
+                    return false;
+
+                }
+
+
+                // ----------------------------
+                // 检查坐标
+                // ----------------------------
+
+                return (
+                    Number(unit.q) ===
+                        Number(q) &&
+                    Number(unit.r) ===
+                        Number(r)
+                );
+
+            }
+        );
+
+    }
+
+
+    // ========================================
+    // 获取某格上的单位
+    // ========================================
+
+    getUnitAt(
+        q,
+        r,
+        units = [],
+        movingUnit = null
+    ) {
+
+        if (
+            !Array.isArray(units)
+        ) {
+
+            return null;
+
+        }
+
+
+        return (
+            units.find(
+                unit => {
+
+                    if (!unit) {
+
+                        return false;
+
+                    }
+
+
+                    if (
+                        unit ===
+                        movingUnit
+                    ) {
+
+                        return false;
+
+                    }
+
+
+                    if (
+                        !this.isUnitAlive(
+                            unit
+                        )
+                    ) {
+
+                        return false;
+
+                    }
+
+
+                    return (
+                        Number(unit.q) ===
+                            Number(q) &&
+                        Number(unit.r) ===
+                            Number(r)
+                    );
+
+                }
+            ) ??
+            null
+        );
+
+    }
+
+
+    // ========================================
     // 地形移动成本
     // ========================================
 
@@ -128,6 +320,44 @@ export class Pathfinding {
         units = []
     ) {
 
+        // ------------------------------------
+        // 基础安全检查
+        // ------------------------------------
+
+        if (!unit) {
+
+            return {
+
+                costs:
+                    new Map(),
+
+                previous:
+                    new Map()
+
+            };
+
+        }
+
+
+        if (
+            !this.isUnitAlive(
+                unit
+            )
+        ) {
+
+            return {
+
+                costs:
+                    new Map(),
+
+                previous:
+                    new Map()
+
+            };
+
+        }
+
+
         const startKey =
             this.key(
                 unit.q,
@@ -152,24 +382,28 @@ export class Pathfinding {
         const queue = [
 
             {
-                q: unit.q,
-                r: unit.r,
-                cost: 0
+
+                q:
+                    Number(unit.q),
+
+                r:
+                    Number(unit.r),
+
+                cost:
+                    0
+
             }
 
         ];
 
 
+        // ====================================
+        // Dijkstra
+        // ====================================
+
         while (
             queue.length > 0
         ) {
-
-            /*
-             * 当前地图不大，
-             * V0.4A 使用简单优先队列即可。
-             *
-             * 后面地图扩大后再升级。
-             */
 
             queue.sort(
                 (a, b) =>
@@ -191,7 +425,9 @@ export class Pathfinding {
 
             if (
                 current.cost >
-                costs.get(currentKey)
+                costs.get(
+                    currentKey
+                )
             ) {
 
                 continue;
@@ -211,13 +447,32 @@ export class Pathfinding {
                 of neighbors
             ) {
 
-                /*
-                 * 暂时允许穿过己方单位，
-                 * 但不能停在已经过度拥挤的位置。
-                 *
-                 * 正式堆叠系统之后再处理。
-                 */
+                // ====================================
+                // 核心规则：
+                //
+                // 任何存活单位所在格
+                // 都不能进入，也不能穿过。
+                //
+                // 不区分己方 / 敌方。
+                // ====================================
 
+                if (
+                    this.isHexOccupied(
+                        neighbor.q,
+                        neighbor.r,
+                        units,
+                        unit
+                    )
+                ) {
+
+                    continue;
+
+                }
+
+
+                // ====================================
+                // 地形成本
+                // ====================================
 
                 const moveCost =
                     this.terrainCost(
@@ -231,6 +486,10 @@ export class Pathfinding {
                     current.cost +
                     moveCost;
 
+
+                // ====================================
+                // 超出剩余移动点
+                // ====================================
 
                 if (
                     newCost >
@@ -248,6 +507,10 @@ export class Pathfinding {
                         neighbor.r
                     );
 
+
+                // ====================================
+                // 找到更低成本路径
+                // ====================================
 
                 if (
                     !costs.has(
@@ -273,11 +536,14 @@ export class Pathfinding {
 
                     queue.push({
 
-                        q: neighbor.q,
+                        q:
+                            neighbor.q,
 
-                        r: neighbor.r,
+                        r:
+                            neighbor.r,
 
-                        cost: newCost
+                        cost:
+                            newCost
 
                     });
 
@@ -288,9 +554,9 @@ export class Pathfinding {
         }
 
 
-        /*
-         * 起点不算“可移动位置”。
-         */
+        // ====================================
+        // 起点不能作为移动目标
+        // ====================================
 
         costs.delete(
             startKey
@@ -318,6 +584,16 @@ export class Pathfinding {
         targetR,
         previous
     ) {
+
+        if (
+            !unit ||
+            !previous
+        ) {
+
+            return [];
+
+        }
+
 
         const startKey =
             this.key(
@@ -362,8 +638,11 @@ export class Pathfinding {
 
 
             path.push({
+
                 q,
+
                 r
+
             });
 
 
