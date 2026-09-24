@@ -427,15 +427,41 @@ export class UnitSelection {
          * 后绘制单位优先。
          */
 
-        for (
-            let i =
-                units.length - 1;
-            i >= 0;
-            i--
-        ) {
+       for (
+    let i =
+        units.length - 1;
+    i >= 0;
+    i--
+) {
 
-            const unit =
-                units[i];
+    const unit =
+        units[i];
+
+
+    if (
+        !unit ||
+        unit.destroyed === true ||
+        Number(unit.strength ?? 0) <= 0
+    ) {
+
+        continue;
+
+    }
+
+
+    const p =
+        this.getUnitScreenPosition(
+            unit
+        );
+
+
+    if (!p) {
+
+        continue;
+
+    }
+
+    // 后面保持原代码
 
 
             const p =
