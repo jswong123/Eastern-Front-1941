@@ -4508,32 +4508,26 @@ export class Renderer {
 
  
 
-            const currentStrengthForRender =
+            const strengthForRender =
+                Number(unit?.strength);
 
-                Number(
+            const manpowerForRender =
+                Number(unit?.manpower);
 
-                    unit?.manpower ??
+            const strengthDead =
+                Number.isFinite(strengthForRender) &&
+                strengthForRender <= 0;
 
-                    unit?.strength ??
-
-                    0
-
-                );
-
- 
+            const manpowerDead =
+                Number.isFinite(manpowerForRender) &&
+                manpowerForRender <= 0;
 
             if (
-
                 unit?.destroyed === true ||
-
-                !Number.isFinite(currentStrengthForRender) ||
-
-                currentStrengthForRender <= 0
-
+                strengthDead ||
+                manpowerDead
             ) {
-
                 continue;
-
             }
 
  
