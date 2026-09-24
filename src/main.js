@@ -2,7 +2,7 @@
 
 // main.js
 
-// 东线 1941 V0.9 — CombatSystem / AISystem 接口兼容版
+// 东线 1941 V1.0 — 双阵营玩家控制 / 动态 AI 修正版
 
 // ============================================================
 
@@ -536,6 +536,8 @@ function getPlayerSide() {
 
  
 
+        gameState.playerFaction ??
+
         gameState.playerSide ??
 
         gameState.side ??
@@ -549,8 +551,6 @@ function getPlayerSide() {
  
 
 }
-
- 
 
  
 
@@ -1122,39 +1122,11 @@ function isUnitActive(unit) {
 
  
 
- 
-
     if (!turnSystem) {
 
         return true;
 
     }
-
- 
-
- 
-
-    if (
-
-        typeof turnSystem.isUnitActive ===
-
-        "function"
-
-    ) {
-
- 
-
-        return turnSystem.isUnitActive(
-
-            unit
-
-        );
-
- 
-
-    }
-
- 
 
  
 
@@ -1173,8 +1145,6 @@ function isUnitActive(unit) {
  
 
 }
-
- 
 
  
 
@@ -2798,15 +2768,9 @@ function tryMoveSelectedUnit(q, r) {
 
     if (!selectedUnit) {
 
- 
-
         return false;
 
- 
-
     }
-
- 
 
  
 
@@ -2820,21 +2784,13 @@ function tryMoveSelectedUnit(q, r) {
 
     ) {
 
- 
-
         return false;
-
- 
 
     }
 
  
 
- 
-
-    // 目标存在其他单位
-
- 
+    // 目标格不能被其他单位占据
 
     const occupyingUnit =
 
@@ -2848,33 +2804,137 @@ function tryMoveSelectedUnit(q, r) {
 
  
 
- 
-
     if (
 
         occupyingUnit &&
 
         occupyingUnit !==
 
-            selectedUnit
+        selectedUnit
 
     ) {
 
- 
-
         return false;
-
- 
 
     }
 
  
 
+    // 必须是 MovementSystem 当前计算出的可移动格
+
+    if (
+
+        typeof movementSystem.canMoveTo ===
+
+        "function"
+
+    ) {
+
+        if (
+
+            !movementSystem.canMoveTo(
+
+                q,
+
+                r
+
+            )
+
+        ) {
+
+            return false;
+
+        }
+
+    }
+
+    else {
+
+        const reachableData =
+
+            getReachableData(
+
+                q,
+
+                r
+
+            );
+
  
 
-    const reachableData =
+        if (
 
-        getReachableData(
+            reachableData == null
+
+        ) {
+
+            return false;
+
+        }
+
+    }
+
+ 
+
+    // ========================================================
+
+    // V0.9.1 玩家移动
+
+    //
+
+    // 移动统一交给 MovementSystem。
+
+    // 不再由 main.js 直接修改 q / r，
+
+    // 也不再由 TurnSystem 再扣一次行动点。
+
+    // ========================================================
+
+ 
+
+    if (
+
+        typeof movementSystem.moveTo !==
+
+        "function"
+
+    ) {
+
+        console.error(
+
+            "MovementSystem.moveTo() 不存在"
+
+        );
+
+        return false;
+
+    }
+
+ 
+
+    const moveResult =
+
+        movementSystem.moveTo(
+
+            q,
+
+            r,
+
+            units
+
+        );
+
+ 
+
+    if (!moveResult) {
+
+        console.warn(
+
+            "玩家移动失败：",
+
+            selectedUnit?.id ??
+
+            selectedUnit?.name,
 
             q,
 
@@ -2882,261 +2942,21 @@ function tryMoveSelectedUnit(q, r) {
 
         );
 
- 
-
- 
-
-    if (
-
-        reachableData == null
-
-    ) {
-
- 
-
         return false;
 
- 
-
     }
 
  
 
- 
+    selectedUnit =
 
-    const movementCost =
+        moveResult.unit ??
 
-        getMovementCost(
-
-            reachableData
-
-        );
+        selectedUnit;
 
  
 
- 
-
-    if (
-
-        movementCost == null
-
-    ) {
-
- 
-
-        return false;
-
- 
-
-    }
-
- 
-
- 
-
-    // ========================================================
-
-    // AP 检查
-
-    // ========================================================
-
- 
-
-    if (
-
-        turnSystem &&
-
-        typeof turnSystem.canSpendAP ===
-
-        "function"
-
-    ) {
-
- 
-
-        if (
-
-            !turnSystem.canSpendAP(
-
-                selectedUnit,
-
-                movementCost
-
-            )
-
-        ) {
-
- 
-
-            return false;
-
- 
-
-        }
-
- 
-
-    }
-
- 
-
- 
-
-    // ========================================================
-
-    // 移动
-
-    // ========================================================
-
- 
-
-    selectedUnit.q =
-
-        q;
-
- 
-
-    selectedUnit.r =
-
-        r;
-
- 
-
- 
-
-    // ========================================================
-
-    // 消耗 AP
-
-    // ========================================================
-
- 
-
-    if (
-
-        turnSystem &&
-
-        typeof turnSystem.registerMove ===
-
-        "function"
-
-    ) {
-
- 
-
-        turnSystem.registerMove(
-
- 
-
-            selectedUnit,
-
- 
-
-            movementCost
-
- 
-
-        );
-
- 
-
-    }
-
- 
-
-    else {
-
- 
-
-        const currentAP =
-
- 
-
-            selectedUnit.actionPoints ??
-
-            selectedUnit.ap;
-
- 
-
- 
-
-        if (
-
-            Number.isFinite(
-
-                currentAP
-
-            )
-
-        ) {
-
- 
-
-            if (
-
-                selectedUnit.actionPoints != null
-
-            ) {
-
- 
-
-                selectedUnit.actionPoints =
-
-                    Math.max(
-
-                        0,
-
-                        currentAP -
-
-                        movementCost
-
-                    );
-
- 
-
-            }
-
- 
-
-            else {
-
- 
-
-                selectedUnit.ap =
-
-                    Math.max(
-
-                        0,
-
-                        currentAP -
-
-                        movementCost
-
-                    );
-
- 
-
-            }
-
- 
-
-        }
-
- 
-
-    }
-
- 
-
- 
-
-    // ========================================================
-
-    // 继续保持单位选中
-
-    // ========================================================
-
- 
+    // 保持选择状态
 
     if (
 
@@ -3146,19 +2966,13 @@ function tryMoveSelectedUnit(q, r) {
 
     ) {
 
- 
-
         selection.select(
 
             selectedUnit
 
         );
 
- 
-
     }
-
- 
 
  
 
@@ -3170,45 +2984,55 @@ function tryMoveSelectedUnit(q, r) {
 
     ) {
 
- 
-
         renderer.setSelectedUnit(
 
             selectedUnit
 
         );
 
+    }
+
  
+
+    // MovementSystem.moveTo(q, r, units)
+
+    // 已经扣除 movementPoints 并重新计算剩余移动范围。
+
+    if (
+
+        typeof renderer.setReachable ===
+
+        "function"
+
+    ) {
+
+        renderer.setReachable(
+
+            movementSystem.reachable
+
+        );
 
     }
 
  
 
- 
+    console.log(
 
-    // ========================================================
+        "玩家移动成功：",
 
-    // 重新计算移动范围
+        selectedUnit.id ??
 
-    // ========================================================
+        selectedUnit.name,
 
- 
+        "消耗：",
 
-    calculateReachable(
+        moveResult.cost,
 
-        selectedUnit
+        "剩余行动点：",
+
+        selectedUnit.movementPoints
 
     );
-
- 
-
- 
-
-    // ========================================================
-
-    // 更新单位信息
-
-    // ========================================================
 
  
 
@@ -3220,23 +3044,13 @@ function tryMoveSelectedUnit(q, r) {
 
  
 
- 
-
     render();
-
- 
 
  
 
     return true;
 
- 
-
 }
-
- 
-
- 
 
 // ============================================================
 
@@ -3466,75 +3280,149 @@ function sleep(ms) {
 
  
 
-async function runSovietAI() {
-
-    if (aiRunning || gameOver || !turnSystem) return;
-
-    if (normalizeSide(turnSystem.phase) !== "soviet") return;
+async function runAIPhase() {
 
  
 
-    aiRunning = true;
+    if (
 
-    if (endPhaseButton) endPhaseButton.disabled = true;
+        aiRunning ||
+
+        gameOver ||
+
+        !turnSystem
+
+    ) {
+
+        return;
+
+    }
 
  
 
-    try {
+    const currentSide =
 
-        resetFactionForPhase("soviet");
+        normalizeSide(
 
- 
-
-        const sovietUnits = units.filter(unit =>
-
-            getUnitSide(unit) === "soviet" &&
-
-            !unit.destroyed &&
-
-            getUnitStrength(unit) > 0
+            turnSystem.phase
 
         );
 
  
 
-        for (const unit of sovietUnits) {
+    const playerSide =
 
-            if (gameOver) break;
-
- 
-
-            const result = aiSystem.actUnit(unit, units);
+        getPlayerSide();
 
  
 
-            if (result?.type === "attack" && result.result?.success) {
+    if (
 
-                const combat = result.result;
+        !currentSide ||
 
-                writeBattleMessage(
+        currentSide === playerSide
 
-                    `苏军 AI：${unitName(combat.attacker)} 攻击 ${unitName(combat.defender)}，` +
+    ) {
 
-                    `造成 ${combat.damage} 点损失` +
+        return;
 
-                    `（${combat.beforeStrength} → ${combat.afterStrength}）` +
+    }
 
-                    `${combat.destroyed ? "，目标被消灭" : ""}`
+ 
 
-                );
+    aiRunning = true;
+
+ 
+
+    if (endPhaseButton) {
+
+        endPhaseButton.disabled = true;
+
+    }
+
+ 
+
+    try {
+
+ 
+
+        resetFactionForPhase(
+
+            currentSide
+
+        );
+
+ 
+
+        const aiUnits =
+
+            units.filter(
+
+                unit =>
+
+                    getUnitSide(unit) === currentSide &&
+
+                    !unit.destroyed &&
+
+                    getUnitStrength(unit) > 0
+
+            );
+
+ 
+
+        const sideLabel =
+
+            currentSide === "german"
+
+                ? "德军 AI"
+
+                : "苏军 AI";
+
+ 
+
+        for (const unit of aiUnits) {
+
+ 
+
+            if (gameOver) {
+
+                break;
 
             }
 
  
 
-            if (result?.type === "move-and-attack" && result.combat?.success) {
+            const result =
 
-                const combat = result.combat;
+                aiSystem.actUnit(
+
+                    unit,
+
+                    units
+
+                );
+
+ 
+
+            if (
+
+                result?.type === "attack" &&
+
+                result.result?.success
+
+            ) {
+
+ 
+
+                const combat =
+
+                    result.result;
+
+ 
 
                 writeBattleMessage(
 
-                    `苏军 AI：${unitName(combat.attacker)} 移动后攻击 ${unitName(combat.defender)}，` +
+                    `${sideLabel}：${unitName(combat.attacker)} 攻击 ${unitName(combat.defender)}，` +
 
                     `造成 ${combat.damage} 点损失` +
 
@@ -3543,6 +3431,42 @@ async function runSovietAI() {
                     `${combat.destroyed ? "，目标被消灭" : ""}`
 
                 );
+
+ 
+
+            }
+
+ 
+
+            if (
+
+                result?.type === "move-and-attack" &&
+
+                result.combat?.success
+
+            ) {
+
+ 
+
+                const combat =
+
+                    result.combat;
+
+ 
+
+                writeBattleMessage(
+
+                    `${sideLabel}：${unitName(combat.attacker)} 移动后攻击 ${unitName(combat.defender)}，` +
+
+                    `造成 ${combat.damage} 点损失` +
+
+                    `（${combat.beforeStrength} → ${combat.afterStrength}）` +
+
+                    `${combat.destroyed ? "，目标被消灭" : ""}`
+
+                );
+
+ 
 
             }
 
@@ -3550,43 +3474,125 @@ async function runSovietAI() {
 
             removeDestroyedUnits();
 
+ 
+
             render();
 
  
 
-            if (checkVictory()) break;
+            if (checkVictory()) {
+
+                break;
+
+            }
+
+ 
 
             await sleep(220);
+
+ 
 
         }
 
  
 
-        if (!gameOver && normalizeSide(turnSystem.phase) === "soviet") {
+        if (
+
+            !gameOver &&
+
+            normalizeSide(turnSystem.phase) === currentSide
+
+        ) {
+
+ 
 
             clearSelection();
+
+ 
 
             turnSystem.endPhase?.();
 
  
 
-            // 新的德军阶段恢复移动与攻击状态
+            const nextSide =
 
-            resetFactionForPhase("german");
+                normalizeSide(
+
+                    turnSystem.phase
+
+                );
+
+ 
+
+            resetFactionForPhase(
+
+                nextSide
+
+            );
 
  
 
             updateTurnUI();
 
+ 
+
             render();
+
+ 
+
+            if (
+
+                !gameOver &&
+
+                nextSide &&
+
+                nextSide !== getPlayerSide()
+
+            ) {
+
+ 
+
+                setTimeout(
+
+                    () => {
+
+                        runAIPhase();
+
+                    },
+
+                    250
+
+                );
+
+ 
+
+            }
+
+ 
 
         }
 
-    } catch (error) {
+ 
 
-        console.error("苏军 AI 行动失败：", error);
+    }
+
+    catch (error) {
+
+ 
+
+        console.error(
+
+            "AI 行动失败：",
+
+            error
+
+        );
+
+ 
 
         if (unitInfo) {
+
+ 
 
             unitInfo.innerHTML =
 
@@ -3594,15 +3600,39 @@ async function runSovietAI() {
 
                 `<div>${error?.message ?? error}</div>`;
 
+ 
+
         }
 
-    } finally {
+ 
+
+    }
+
+    finally {
+
+ 
 
         aiRunning = false;
 
-        if (endPhaseButton && !gameOver) endPhaseButton.disabled = false;
+ 
+
+        if (
+
+            endPhaseButton &&
+
+            !gameOver
+
+        ) {
+
+            endPhaseButton.disabled = false;
+
+        }
+
+ 
 
     }
+
+ 
 
 }
 
@@ -4572,7 +4602,13 @@ function endCurrentPhase() {
 
  
 
-    if (gameOver || aiRunning) {
+    if (
+
+        gameOver ||
+
+        aiRunning
+
+    ) {
 
         return;
 
@@ -4582,21 +4618,49 @@ function endCurrentPhase() {
 
     if (!turnSystem) {
 
- 
-
         return;
-
- 
 
     }
 
  
 
+    const currentSide =
+
+        normalizeSide(
+
+            turnSystem.phase
+
+        );
+
+ 
+
+    const playerSide =
+
+        getPlayerSide();
+
+ 
+
+    if (
+
+        playerSide &&
+
+        currentSide !== playerSide
+
+    ) {
+
+ 
+
+        runAIPhase();
+
+ 
+
+        return;
+
+    }
+
  
 
     clearSelection();
-
- 
 
  
 
@@ -4618,6 +4682,22 @@ function endCurrentPhase() {
 
  
 
+    const nextSide =
+
+        normalizeSide(
+
+            turnSystem.phase
+
+        );
+
+ 
+
+    resetFactionForPhase(
+
+        nextSide
+
+    );
+
  
 
     updateTurnUI();
@@ -4628,31 +4708,37 @@ function endCurrentPhase() {
 
  
 
-    // 玩家结束德军阶段后，苏军阶段自动交给 AI
-
     if (
 
         !gameOver &&
 
-        normalizeSide(turnSystem.phase) === "soviet" &&
+        nextSide &&
 
-        getPlayerSide() !== "soviet"
+        nextSide !== getPlayerSide()
 
     ) {
 
-        setTimeout(() => {
+ 
 
-            runSovietAI();
+        setTimeout(
 
-        }, 250);
+            () => {
+
+                runAIPhase();
+
+            },
+
+            250
+
+        );
+
+ 
 
     }
 
  
 
 }
-
- 
 
  
 
@@ -4798,8 +4884,6 @@ function startGame() {
 
  
 
- 
-
     console.log(
 
         "游戏模式：",
@@ -4807,8 +4891,6 @@ function startGame() {
         gameState.mode
 
     );
-
- 
 
  
 
@@ -4828,9 +4910,55 @@ function startGame() {
 
  
 
-}
+    const currentSide =
+
+        normalizeSide(
+
+            turnSystem?.phase
+
+        );
 
  
+
+    const playerSide =
+
+        getPlayerSide();
+
+ 
+
+    if (
+
+        gameState.mode !== "observer" &&
+
+        currentSide &&
+
+        playerSide &&
+
+        currentSide !== playerSide
+
+    ) {
+
+ 
+
+        setTimeout(
+
+            () => {
+
+                runAIPhase();
+
+            },
+
+            250
+
+        );
+
+ 
+
+    }
+
+ 
+
+}
 
  
 
