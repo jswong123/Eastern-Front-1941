@@ -1,46 +1,94 @@
 // ============================================================
 
+ 
+
 // Renderer.js
+
+ 
 
 // 东线 1941
 
+ 
+
 //
+
+ 
 
 // 地图渲染系统
 
+ 
+
 // V0.4A
+
+ 
 
 //
 
+ 
+
 // 功能：
+
+ 
 
 // - 六角格地图
 
+ 
+
 // - 地形
+
+ 
 
 // - 河流
 
+ 
+
 // - 道路
+
+ 
 
 // - 铁路
 
+ 
+
 // - 城镇
+
+ 
 
 // - 军事单位
 
+ 
+
 // - 单位选中框
 
+ 
+
 // - 移动范围
+
+ 
 
 // ============================================================
 
  
 
+ 
+
+ 
+
 import {
+
+ 
 
     drawHexPath
 
+ 
+
 } from "./Hex.js";
+
+ 
+
+ 
+
+ 
 
  
 
@@ -50,15 +98,31 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
     constructor(
+
+ 
 
         canvas,
 
+ 
+
         world,
+
+ 
 
         camera
 
+ 
+
     ) {
+
+ 
+
+ 
 
  
 
@@ -66,7 +130,13 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
         this.ctx =
+
+ 
 
             canvas.getContext("2d");
 
@@ -74,7 +144,15 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
         this.world =
+
+ 
 
             world;
 
@@ -82,7 +160,15 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
         this.camera =
+
+ 
 
             camera;
 
@@ -90,11 +176,25 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
         // ----------------------------------------------------
+
+ 
 
         // Hex 大小
 
+ 
+
         // ----------------------------------------------------
+
+ 
+
+ 
 
  
 
@@ -104,15 +204,33 @@ export class Renderer {
 
  
 
-        // ----------------------------------------------------
+ 
 
-        // 外部系统引用
+ 
+
+ 
 
         // ----------------------------------------------------
 
  
 
+        // 外部系统引用
+
+ 
+
+        // ----------------------------------------------------
+
+ 
+
+ 
+
+ 
+
         this.selection = null;
+
+ 
+
+ 
 
  
 
@@ -122,11 +240,25 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
         // ----------------------------------------------------
+
+ 
 
         // 地图颜色
 
+ 
+
         // ----------------------------------------------------
+
+ 
+
+ 
 
  
 
@@ -134,61 +266,123 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
             plain:
+
+ 
 
                 "#b4b28f",
 
  
 
+ 
+
+ 
+
             forest:
+
+ 
 
                 "#65705a",
 
  
 
+ 
+
+ 
+
             marsh:
+
+ 
 
                 "#87917b",
 
  
 
+ 
+
+ 
+
             urban:
+
+ 
 
                 "#aaa184",
 
  
 
+ 
+
+ 
+
             water:
+
+ 
 
                 "#7693a1",
 
  
 
+ 
+
+ 
+
             grid:
+
+ 
 
                 "#747660",
 
  
 
+ 
+
+ 
+
             road:
+
+ 
 
                 "#a38e69",
 
  
 
+ 
+
+ 
+
             railway:
+
+ 
 
                 "#57564c",
 
  
 
+ 
+
+ 
+
             river:
+
+ 
 
                 "#668ba0"
 
  
 
+ 
+
+ 
+
         };
+
+ 
+
+ 
 
  
 
@@ -198,11 +392,25 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
     // ========================================================
+
+ 
 
     // 清空画布
 
+ 
+
     // ========================================================
+
+ 
+
+ 
 
  
 
@@ -210,9 +418,21 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
         const ctx =
 
+ 
+
             this.ctx;
+
+ 
+
+ 
+
+ 
 
  
 
@@ -224,21 +444,47 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
         ctx.setTransform(
 
-            1,
-
-            0,
-
-            0,
+ 
 
             1,
 
+ 
+
             0,
+
+ 
+
+            0,
+
+ 
+
+            1,
+
+ 
+
+            0,
+
+ 
 
             0
 
+ 
+
         );
+
+ 
+
+ 
+
+ 
 
  
 
@@ -246,15 +492,31 @@ export class Renderer {
 
         ctx.clearRect(
 
-            0,
+ 
 
             0,
+
+ 
+
+            0,
+
+ 
 
             this.canvas.width,
 
+ 
+
             this.canvas.height
 
+ 
+
         );
+
+ 
+
+ 
+
+ 
 
  
 
@@ -262,7 +524,15 @@ export class Renderer {
 
         ctx.fillStyle =
 
+ 
+
             "#8f9078";
+
+ 
+
+ 
+
+ 
 
  
 
@@ -270,15 +540,31 @@ export class Renderer {
 
         ctx.fillRect(
 
-            0,
+ 
 
             0,
+
+ 
+
+            0,
+
+ 
 
             this.canvas.width,
 
+ 
+
             this.canvas.height
 
+ 
+
         );
+
+ 
+
+ 
+
+ 
 
  
 
@@ -288,31 +574,61 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
     }
 
  
 
  
 
+ 
+
+ 
+
+ 
+
     // ========================================================
+
+ 
 
     // Hex → 世界坐标
 
+ 
+
     // ========================================================
+
+ 
+
+ 
 
  
 
     hexToWorld(
 
+ 
+
         q,
 
+ 
+
         r
+
+ 
 
     ) {
 
  
 
+ 
+
+ 
+
         const size =
+
+ 
 
             this.hexSize;
 
@@ -320,37 +636,77 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
         return {
+
+ 
+
+ 
 
  
 
             x:
 
+ 
+
                 size *
+
+ 
 
                 Math.sqrt(3) *
 
+ 
+
                 (
+
+ 
 
                     q +
 
+ 
+
                     r / 2
+
+ 
 
                 ),
 
  
 
+ 
+
+ 
+
             y:
+
+ 
 
                 size *
 
+ 
+
                 1.5 *
+
+ 
 
                 r
 
  
 
+ 
+
+ 
+
         };
+
+ 
+
+ 
 
  
 
@@ -360,21 +716,45 @@ export class Renderer {
 
  
 
-    // ========================================================
+ 
 
-    // 世界坐标 → 屏幕坐标
+ 
+
+ 
 
     // ========================================================
 
  
 
+    // 世界坐标 → 屏幕坐标
+
+ 
+
+    // ========================================================
+
+ 
+
+ 
+
+ 
+
     worldPointToScreen(
+
+ 
 
         x,
 
+ 
+
         y
 
+ 
+
     ) {
+
+ 
+
+ 
 
  
 
@@ -382,27 +762,55 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
             x:
+
+ 
 
                 x *
 
+ 
+
                 this.camera.zoom +
+
+ 
 
                 this.camera.x,
 
  
 
+ 
+
+ 
+
             y:
+
+ 
 
                 y *
 
+ 
+
                 this.camera.zoom +
+
+ 
 
                 this.camera.y
 
  
 
+ 
+
+ 
+
         };
+
+ 
+
+ 
 
  
 
@@ -412,31 +820,63 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
     // ========================================================
+
+ 
 
     // Hex → 屏幕坐标
 
+ 
+
     // ========================================================
+
+ 
+
+ 
 
  
 
     worldToScreen(
 
+ 
+
         q,
 
+ 
+
         r
+
+ 
 
     ) {
 
  
 
+ 
+
+ 
+
         const world =
+
+ 
 
             this.hexToWorld(
 
+ 
+
                 q,
 
+ 
+
                 r
+
+ 
 
             );
 
@@ -444,13 +884,29 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
         return this.worldPointToScreen(
+
+ 
 
             world.x,
 
+ 
+
             world.y
 
+ 
+
         );
+
+ 
+
+ 
 
  
 
@@ -460,29 +916,61 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
     // ========================================================
+
+ 
 
     // 地形颜色
 
+ 
+
     // ========================================================
+
+ 
+
+ 
 
  
 
     terrainColor(
 
+ 
+
         terrain
+
+ 
 
     ) {
 
  
 
+ 
+
+ 
+
         return (
+
+ 
 
             this.colors[terrain] ??
 
+ 
+
             this.colors.plain
 
+ 
+
         );
+
+ 
+
+ 
 
  
 
@@ -492,11 +980,25 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
     // ========================================================
+
+ 
 
     // 绘制基础地图
 
+ 
+
     // ========================================================
+
+ 
+
+ 
 
  
 
@@ -504,7 +1006,13 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
         const ctx =
+
+ 
 
             this.ctx;
 
@@ -512,9 +1020,19 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
         const size =
 
+ 
+
             this.hexSize *
+
+ 
 
             this.camera.zoom;
 
@@ -522,39 +1040,83 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
         for (
+
+ 
 
             let r = 0;
 
+ 
+
             r < this.world.height;
 
+ 
+
             r++
+
+ 
 
         ) {
 
  
 
+ 
+
+ 
+
             for (
+
+ 
 
                 let q = 0;
 
+ 
+
                 q < this.world.width;
 
+ 
+
                 q++
+
+ 
 
             ) {
 
  
 
+ 
+
+ 
+
                 const p =
+
+ 
 
                     this.worldToScreen(
 
+ 
+
                         q,
+
+ 
 
                         r
 
+ 
+
                     );
+
+ 
+
+ 
+
+ 
 
  
 
@@ -562,13 +1124,27 @@ export class Renderer {
 
                 const terrain =
 
+ 
+
                     this.world.terrainAt(
+
+ 
 
                         q,
 
+ 
+
                         r
 
+ 
+
                     );
+
+ 
+
+ 
+
+ 
 
  
 
@@ -576,13 +1152,23 @@ export class Renderer {
 
                 drawHexPath(
 
+ 
+
                     ctx,
+
+ 
 
                     p.x,
 
+ 
+
                     p.y,
 
+ 
+
                     size
+
+ 
 
                 );
 
@@ -590,13 +1176,31 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
                 ctx.fillStyle =
+
+ 
 
                     this.terrainColor(
 
+ 
+
                         terrain
 
+ 
+
                     );
+
+ 
+
+ 
+
+ 
 
  
 
@@ -608,7 +1212,15 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
                 ctx.strokeStyle =
+
+ 
 
                     this.colors.grid;
 
@@ -616,15 +1228,35 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
                 ctx.lineWidth =
+
+ 
 
                     Math.max(
 
+ 
+
                         0.6,
+
+ 
 
                         this.camera.zoom
 
+ 
+
                     );
+
+ 
+
+ 
+
+ 
 
  
 
@@ -634,11 +1266,23 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
             }
 
  
 
+ 
+
+ 
+
         }
+
+ 
+
+ 
 
  
 
@@ -648,41 +1292,85 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
     // ========================================================
+
+ 
 
     // 获取地图要素
 
+ 
+
     // ========================================================
+
+ 
+
+ 
 
  
 
     getFeatureArray(
 
+ 
+
         ...names
+
+ 
 
     ) {
 
  
 
+ 
+
+ 
+
         for (
+
+ 
 
             const name
 
+ 
+
             of names
+
+ 
 
         ) {
 
  
 
+ 
+
+ 
+
             if (
+
+ 
 
                 Array.isArray(
 
+ 
+
                     this.world[name]
+
+ 
 
                 )
 
+ 
+
             ) {
+
+ 
+
+ 
 
  
 
@@ -690,11 +1378,25 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
             }
 
  
 
+ 
+
+ 
+
         }
+
+ 
+
+ 
+
+ 
 
  
 
@@ -704,31 +1406,61 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
     }
 
  
 
  
 
+ 
+
+ 
+
+ 
+
     // ========================================================
+
+ 
 
     // 将地图要素节点转换成 Hex
 
+ 
+
     // ========================================================
+
+ 
+
+ 
 
  
 
     featureHex(
 
+ 
+
         point
+
+ 
 
     ) {
 
  
 
+ 
+
+ 
+
         if (!point) {
 
+ 
+
             return null;
+
+ 
 
         }
 
@@ -736,15 +1468,33 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
         if (
 
+ 
+
             Array.isArray(point)
+
+ 
 
         ) {
 
  
 
+ 
+
+ 
+
             return {
+
+ 
+
+ 
 
  
 
@@ -752,7 +1502,15 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
                 r: Number(point[1])
+
+ 
+
+ 
 
  
 
@@ -760,7 +1518,17 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
         }
+
+ 
+
+ 
+
+ 
 
  
 
@@ -768,11 +1536,21 @@ export class Renderer {
 
         if (
 
+ 
+
             point.q !== undefined &&
+
+ 
 
             point.r !== undefined
 
+ 
+
         ) {
+
+ 
+
+ 
 
  
 
@@ -780,7 +1558,15 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
                 q: Number(point.q),
+
+ 
+
+ 
 
  
 
@@ -788,11 +1574,25 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
             };
 
  
 
+ 
+
+ 
+
         }
+
+ 
+
+ 
+
+ 
 
  
 
@@ -802,31 +1602,61 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
     }
 
  
 
  
 
+ 
+
+ 
+
+ 
+
     // ========================================================
+
+ 
 
     // 绘制线路
 
+ 
+
     // ========================================================
+
+ 
+
+ 
 
  
 
     drawFeatureLines(
 
+ 
+
         features,
 
+ 
+
         options = {}
+
+ 
 
     ) {
 
  
 
+ 
+
+ 
+
         const ctx =
+
+ 
 
             this.ctx;
 
@@ -834,9 +1664,19 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
         const color =
 
+ 
+
             options.color ??
+
+ 
 
             "#000000";
 
@@ -844,9 +1684,19 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
         const width =
 
+ 
+
             options.width ??
+
+ 
 
             2;
 
@@ -854,11 +1704,27 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
         const dashed =
+
+ 
 
             options.dashed ??
 
+ 
+
             false;
+
+ 
+
+ 
+
+ 
 
  
 
@@ -870,7 +1736,15 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
         ctx.strokeStyle =
+
+ 
 
             color;
 
@@ -878,9 +1752,19 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
         ctx.lineWidth =
 
+ 
+
             width *
+
+ 
 
             this.camera.zoom;
 
@@ -888,9 +1772,23 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
         ctx.lineCap =
 
+ 
+
             "round";
+
+ 
+
+ 
+
+ 
 
  
 
@@ -898,7 +1796,15 @@ export class Renderer {
 
         ctx.lineJoin =
 
+ 
+
             "round";
+
+ 
+
+ 
+
+ 
 
  
 
@@ -908,13 +1814,27 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
             ctx.setLineDash([
+
+ 
 
                 5 * this.camera.zoom,
 
+ 
+
                 5 * this.camera.zoom
 
+ 
+
             ]);
+
+ 
+
+ 
 
  
 
@@ -924,23 +1844,47 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
         for (
+
+ 
 
             const feature
 
+ 
+
             of features
+
+ 
 
         ) {
 
  
 
+ 
+
+ 
+
             const points =
+
+ 
 
                 feature.points ??
 
+ 
+
                 feature.path ??
 
+ 
+
                 feature.hexes ??
+
+ 
 
                 feature;
 
@@ -948,13 +1892,29 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
             if (
+
+ 
 
                 !Array.isArray(points) ||
 
+ 
+
                 points.length < 2
 
+ 
+
             ) {
+
+ 
+
+ 
 
  
 
@@ -962,7 +1922,17 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
             }
+
+ 
+
+ 
+
+ 
 
  
 
@@ -974,7 +1944,15 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
             let started =
+
+ 
 
                 false;
 
@@ -982,23 +1960,51 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
             for (
+
+ 
 
                 const rawPoint
 
+ 
+
                 of points
+
+ 
 
             ) {
 
  
 
+ 
+
+ 
+
                 const hex =
+
+ 
 
                     this.featureHex(
 
+ 
+
                         rawPoint
 
+ 
+
                     );
+
+ 
+
+ 
+
+ 
 
  
 
@@ -1006,7 +2012,11 @@ export class Renderer {
 
                 if (!hex) {
 
+ 
+
                     continue;
+
+ 
 
                 }
 
@@ -1014,15 +2024,35 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
                 const p =
+
+ 
 
                     this.worldToScreen(
 
+ 
+
                         hex.q,
+
+ 
 
                         hex.r
 
+ 
+
                     );
+
+ 
+
+ 
+
+ 
 
  
 
@@ -1032,13 +2062,29 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
                     ctx.moveTo(
+
+ 
 
                         p.x,
 
+ 
+
                         p.y
 
+ 
+
                     );
+
+ 
+
+ 
+
+ 
 
  
 
@@ -1046,11 +2092,21 @@ export class Renderer {
 
                     started =
 
+ 
+
                         true;
 
  
 
+ 
+
+ 
+
                 }
+
+ 
+
+ 
 
  
 
@@ -1058,13 +2114,27 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
                     ctx.lineTo(
+
+ 
 
                         p.x,
 
+ 
+
                         p.y
 
+ 
+
                     );
+
+ 
+
+ 
 
  
 
@@ -1072,7 +2142,17 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
             }
+
+ 
+
+ 
+
+ 
 
  
 
@@ -1082,11 +2162,23 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
                 ctx.stroke();
 
  
 
+ 
+
+ 
+
             }
+
+ 
+
+ 
 
  
 
@@ -1096,7 +2188,17 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
         ctx.restore();
+
+ 
+
+ 
 
  
 
@@ -1106,11 +2208,25 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
     // ========================================================
+
+ 
 
     // 河流
 
+ 
+
     // ========================================================
+
+ 
+
+ 
 
  
 
@@ -1118,13 +2234,25 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
         const rivers =
+
+ 
 
             this.getFeatureArray(
 
+ 
+
                 "rivers",
 
+ 
+
                 "riverFeatures"
+
+ 
 
             );
 
@@ -1132,25 +2260,53 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
         this.drawFeatureLines(
+
+ 
 
             rivers,
 
+ 
+
             {
 
+ 
+
                 color:
+
+ 
 
                     this.colors.river,
 
  
 
+ 
+
+ 
+
                 width:
+
+ 
 
                     3.2
 
+ 
+
             }
 
+ 
+
         );
+
+ 
+
+ 
 
  
 
@@ -1160,11 +2316,25 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
     // ========================================================
+
+ 
 
     // 道路
 
+ 
+
     // ========================================================
+
+ 
+
+ 
 
  
 
@@ -1172,13 +2342,25 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
         const roads =
+
+ 
 
             this.getFeatureArray(
 
+ 
+
                 "roads",
 
+ 
+
                 "roadFeatures"
+
+ 
 
             );
 
@@ -1186,25 +2368,53 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
         this.drawFeatureLines(
+
+ 
 
             roads,
 
+ 
+
             {
 
+ 
+
                 color:
+
+ 
 
                     this.colors.road,
 
  
 
+ 
+
+ 
+
                 width:
+
+ 
 
                     1.8
 
+ 
+
             }
 
+ 
+
         );
+
+ 
+
+ 
 
  
 
@@ -1214,11 +2424,25 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
     // ========================================================
+
+ 
 
     // 铁路
 
+ 
+
     // ========================================================
+
+ 
+
+ 
 
  
 
@@ -1226,15 +2450,29 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
         const railways =
+
+ 
 
             this.getFeatureArray(
 
+ 
+
                 "railways",
+
+ 
 
                 "rails",
 
+ 
+
                 "railwayFeatures"
+
+ 
 
             );
 
@@ -1242,31 +2480,65 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
         this.drawFeatureLines(
+
+ 
 
             railways,
 
+ 
+
             {
 
+ 
+
                 color:
+
+ 
 
                     this.colors.railway,
 
  
 
+ 
+
+ 
+
                 width:
+
+ 
 
                     1.2,
 
  
 
+ 
+
+ 
+
                 dashed:
+
+ 
 
                     true
 
+ 
+
             }
 
+ 
+
         );
+
+ 
+
+ 
 
  
 
@@ -1276,11 +2548,25 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
     // ========================================================
+
+ 
 
     // 城镇
 
+ 
+
     // ========================================================
+
+ 
+
+ 
 
  
 
@@ -1288,15 +2574,29 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
         const settlements =
+
+ 
 
             this.getFeatureArray(
 
+ 
+
                 "settlements",
+
+ 
 
                 "cities",
 
+ 
+
                 "towns"
+
+ 
 
             );
 
@@ -1304,9 +2604,23 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
         const ctx =
 
+ 
+
             this.ctx;
+
+ 
+
+ 
+
+ 
 
  
 
@@ -1318,17 +2632,35 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
         for (
+
+ 
 
             const settlement
 
+ 
+
             of settlements
+
+ 
 
         ) {
 
  
 
+ 
+
+ 
+
             const q =
+
+ 
 
                 settlement.q;
 
@@ -1336,7 +2668,15 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
             const r =
+
+ 
 
                 settlement.r;
 
@@ -1344,17 +2684,37 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
             if (
+
+ 
 
                 q === undefined ||
 
+ 
+
                 r === undefined
+
+ 
 
             ) {
 
  
 
+ 
+
+ 
+
                 continue;
+
+ 
+
+ 
 
  
 
@@ -1364,15 +2724,35 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
             const p =
+
+ 
 
                 this.worldToScreen(
 
+ 
+
                     q,
+
+ 
 
                     r
 
+ 
+
                 );
+
+ 
+
+ 
+
+ 
 
  
 
@@ -1380,15 +2760,31 @@ export class Renderer {
 
             const radius =
 
+ 
+
                 Math.max(
+
+ 
 
                     3,
 
+ 
+
                     4 *
+
+ 
 
                     this.camera.zoom
 
+ 
+
                 );
+
+ 
+
+ 
+
+ 
 
  
 
@@ -1400,17 +2796,35 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
             ctx.arc(
+
+ 
 
                 p.x,
 
+ 
+
                 p.y,
+
+ 
 
                 radius,
 
+ 
+
                 0,
 
+ 
+
                 Math.PI * 2
+
+ 
 
             );
 
@@ -1418,9 +2832,23 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
             ctx.fillStyle =
 
+ 
+
                 "#34352e";
+
+ 
+
+ 
+
+ 
 
  
 
@@ -1432,19 +2860,39 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
             ctx.font =
+
+ 
 
                 `${
 
+ 
+
                     Math.max(
+
+ 
 
                         10,
 
+ 
+
                         13 *
+
+ 
 
                         this.camera.zoom
 
+ 
+
                     )
+
+ 
 
                 }px FangSong, STKaiti, serif`;
 
@@ -1452,7 +2900,15 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
             ctx.fillStyle =
+
+ 
 
                 "#4c493f";
 
@@ -1460,7 +2916,15 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
             ctx.textAlign =
+
+ 
 
                 "left";
 
@@ -1468,7 +2932,15 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
             ctx.textBaseline =
+
+ 
 
                 "middle";
 
@@ -1476,25 +2948,55 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
             ctx.fillText(
+
+ 
 
                 settlement.name ??
 
+ 
+
                 "",
+
+ 
 
                 p.x +
 
+ 
+
                 radius +
+
+ 
 
                 5,
 
+ 
+
                 p.y
+
+ 
 
             );
 
  
 
+ 
+
+ 
+
         }
+
+ 
+
+ 
+
+ 
 
  
 
@@ -1504,17 +3006,35 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
     }
 
  
 
  
 
+ 
+
+ 
+
+ 
+
     // ========================================================
+
+ 
 
     // 移动范围
 
+ 
+
     // ========================================================
+
+ 
+
+ 
 
  
 
@@ -1522,17 +3042,35 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
         if (
+
+ 
 
             !this.movementSystem ||
 
+ 
+
             !this.movementSystem.selectedUnit
+
+ 
 
         ) {
 
  
 
+ 
+
+ 
+
             return;
+
+ 
+
+ 
 
  
 
@@ -1542,7 +3080,15 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
         const ctx =
+
+ 
 
             this.ctx;
 
@@ -1550,11 +3096,27 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
         const size =
+
+ 
 
             this.hexSize *
 
+ 
+
             this.camera.zoom;
+
+ 
+
+ 
+
+ 
 
  
 
@@ -1566,37 +3128,75 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
         for (
-
-            const [
-
-                key,
-
-                cost
-
-            ]
-
-            of this.movementSystem
-
-                .reachable
-
-                .entries()
-
-        ) {
 
  
 
             const [
 
+ 
+
+                key,
+
+ 
+
+                cost
+
+ 
+
+            ]
+
+ 
+
+            of this.movementSystem
+
+ 
+
+                .reachable
+
+ 
+
+                .entries()
+
+ 
+
+        ) {
+
+ 
+
+ 
+
+ 
+
+            const [
+
+ 
+
                 q,
+
+ 
 
                 r
 
+ 
+
             ] =
+
+ 
 
                 key
 
+ 
+
                     .split(",")
+
+ 
 
                     .map(Number);
 
@@ -1604,13 +3204,27 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
             const p =
+
+ 
 
                 this.worldToScreen(
 
+ 
+
                     q,
 
+ 
+
                     r
+
+ 
 
                 );
 
@@ -1618,15 +3232,31 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
             drawHexPath(
+
+ 
 
                 ctx,
 
+ 
+
                 p.x,
+
+ 
 
                 p.y,
 
+ 
+
                 size * 0.92
+
+ 
 
             );
 
@@ -1634,9 +3264,23 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
             ctx.fillStyle =
 
+ 
+
                 "rgba(96, 137, 91, 0.32)";
+
+ 
+
+ 
+
+ 
 
  
 
@@ -1648,7 +3292,15 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
             ctx.strokeStyle =
+
+ 
 
                 "rgba(65, 103, 65, 0.82)";
 
@@ -1656,15 +3308,31 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
             ctx.lineWidth =
+
+ 
 
                 Math.max(
 
+ 
+
                     1,
+
+ 
 
                     1.5 *
 
+ 
+
                     this.camera.zoom
+
+ 
 
                 );
 
@@ -1672,7 +3340,19 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
             ctx.stroke();
+
+ 
+
+ 
+
+ 
 
  
 
@@ -1682,15 +3362,29 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
             if (
 
+ 
+
                 this.camera.zoom >= 1.15
+
+ 
 
             ) {
 
  
 
+ 
+
+ 
+
                 ctx.fillStyle =
+
+ 
 
                     "rgba(35, 55, 35, 0.75)";
 
@@ -1698,19 +3392,39 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
                 ctx.font =
+
+ 
 
                     `${
 
+ 
+
                         Math.max(
+
+ 
 
                             8,
 
+ 
+
                             9 *
+
+ 
 
                             this.camera.zoom
 
+ 
+
                         )
+
+ 
 
                     }px FangSong, serif`;
 
@@ -1718,7 +3432,15 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
                 ctx.textAlign =
+
+ 
 
                     "center";
 
@@ -1726,7 +3448,15 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
                 ctx.textBaseline =
+
+ 
 
                     "middle";
 
@@ -1734,15 +3464,33 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
                 ctx.fillText(
+
+ 
 
                     String(cost),
 
+ 
+
                     p.x,
+
+ 
 
                     p.y
 
+ 
+
                 );
+
+ 
+
+ 
 
  
 
@@ -1750,7 +3498,17 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
         }
+
+ 
+
+ 
+
+ 
 
  
 
@@ -1760,41 +3518,83 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
     }
 
  
 
  
 
+ 
+
+ 
+
+ 
+
     // ========================================================
+
+ 
 
     // 单位颜色
 
+ 
+
     // ========================================================
+
+ 
+
+ 
 
  
 
     factionColor(
 
+ 
+
         faction
+
+ 
 
     ) {
 
  
 
+ 
+
+ 
+
         if (
+
+ 
 
             faction === "GER" ||
 
+ 
+
             faction === "germany" ||
+
+ 
 
             faction === "German" ||
 
+ 
+
             faction === "GERMAN" ||
+
+ 
 
             faction === "deutsch"
 
+ 
+
         ) {
+
+ 
+
+ 
 
  
 
@@ -1802,7 +3602,17 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
         }
+
+ 
+
+ 
+
+ 
 
  
 
@@ -1810,13 +3620,25 @@ export class Renderer {
 
         if (
 
+ 
+
             faction === "USSR" ||
+
+ 
 
             faction === "soviet" ||
 
+ 
+
             faction === "Soviet"
 
+ 
+
         ) {
+
+ 
+
+ 
 
  
 
@@ -1824,7 +3646,17 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
         }
+
+ 
+
+ 
+
+ 
 
  
 
@@ -1834,37 +3666,73 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
     }
 
  
 
  
 
+ 
+
+ 
+
+ 
+
     // ========================================================
+
+ 
 
     // 绘制军事符号
 
+ 
+
     // ========================================================
+
+ 
+
+ 
 
  
 
     drawMilitarySymbol(
 
+ 
+
         unit,
+
+ 
 
         x,
 
+ 
+
         y,
+
+ 
 
         width,
 
+ 
+
         height
+
+ 
 
     ) {
 
  
 
+ 
+
+ 
+
         const ctx =
+
+ 
 
             this.ctx;
 
@@ -1872,11 +3740,27 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
         const type =
+
+ 
 
             unit.type ??
 
+ 
+
             "infantry";
+
+ 
+
+ 
+
+ 
 
  
 
@@ -1888,9 +3772,23 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
         ctx.strokeStyle =
 
+ 
+
             "#171916";
+
+ 
+
+ 
+
+ 
 
  
 
@@ -1898,7 +3796,15 @@ export class Renderer {
 
         ctx.fillStyle =
 
+ 
+
             "#171916";
+
+ 
+
+ 
+
+ 
 
  
 
@@ -1906,15 +3812,31 @@ export class Renderer {
 
         ctx.lineWidth =
 
+ 
+
             Math.max(
+
+ 
 
                 1.5,
 
+ 
+
                 2 *
+
+ 
 
                 this.camera.zoom
 
+ 
+
             );
+
+ 
+
+ 
+
+ 
 
  
 
@@ -1922,9 +3844,17 @@ export class Renderer {
 
         if (
 
+ 
+
             type === "infantry"
 
+ 
+
         ) {
+
+ 
+
+ 
 
  
 
@@ -1932,43 +3862,87 @@ export class Renderer {
 
  
 
-            ctx.moveTo(
-
-                x - width * 0.32,
-
-                y - height * 0.27
-
-            );
-
  
-
-            ctx.lineTo(
-
-                x + width * 0.32,
-
-                y + height * 0.27
-
-            );
 
  
 
             ctx.moveTo(
 
-                x + width * 0.32,
+ 
+
+                x - width * 0.32,
+
+ 
 
                 y - height * 0.27
+
+ 
 
             );
 
  
 
+ 
+
+ 
+
             ctx.lineTo(
 
-                x - width * 0.32,
+ 
+
+                x + width * 0.32,
+
+ 
 
                 y + height * 0.27
 
+ 
+
             );
+
+ 
+
+ 
+
+ 
+
+            ctx.moveTo(
+
+ 
+
+                x + width * 0.32,
+
+ 
+
+                y - height * 0.27
+
+ 
+
+            );
+
+ 
+
+ 
+
+ 
+
+            ctx.lineTo(
+
+ 
+
+                x - width * 0.32,
+
+ 
+
+                y + height * 0.27
+
+ 
+
+            );
+
+ 
+
+ 
 
  
 
@@ -1976,39 +3950,79 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
         }
+
+ 
+
+ 
 
  
 
         else if (
 
+ 
+
             type === "armor"
+
+ 
 
         ) {
 
  
 
+ 
+
+ 
+
             ctx.beginPath();
+
+ 
+
+ 
 
  
 
             ctx.ellipse(
 
+ 
+
                 x,
+
+ 
 
                 y,
 
+ 
+
                 width * 0.27,
+
+ 
 
                 height * 0.18,
 
-                0,
+ 
 
                 0,
+
+ 
+
+                0,
+
+ 
 
                 Math.PI * 2
 
+ 
+
             );
+
+ 
+
+ 
 
  
 
@@ -2016,15 +4030,31 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
         }
+
+ 
+
+ 
 
  
 
         else if (
 
+ 
+
             type === "artillery"
 
+ 
+
         ) {
+
+ 
+
+ 
 
  
 
@@ -2032,19 +4062,39 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
             ctx.arc(
+
+ 
 
                 x,
 
+ 
+
                 y,
+
+ 
 
                 height * 0.13,
 
+ 
+
                 0,
+
+ 
 
                 Math.PI * 2
 
+ 
+
             );
+
+ 
+
+ 
 
  
 
@@ -2052,15 +4102,31 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
         }
+
+ 
+
+ 
 
  
 
         else if (
 
+ 
+
             type === "antitank"
 
+ 
+
         ) {
+
+ 
+
+ 
 
  
 
@@ -2068,23 +4134,47 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
             ctx.moveTo(
+
+ 
 
                 x - width * 0.28,
 
+ 
+
                 y
+
+ 
 
             );
 
  
 
+ 
+
+ 
+
             ctx.lineTo(
+
+ 
 
                 x + width * 0.28,
 
+ 
+
                 y
 
+ 
+
             );
+
+ 
+
+ 
 
  
 
@@ -2094,23 +4184,49 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
             ctx.beginPath();
+
+ 
+
+ 
 
  
 
             ctx.arc(
 
+ 
+
                 x,
+
+ 
 
                 y,
 
+ 
+
                 height * 0.12,
+
+ 
 
                 0,
 
+ 
+
                 Math.PI * 2
 
+ 
+
             );
+
+ 
+
+ 
 
  
 
@@ -2118,15 +4234,31 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
         }
+
+ 
+
+ 
 
  
 
         else if (
 
+ 
+
             type === "reconnaissance"
 
+ 
+
         ) {
+
+ 
+
+ 
 
  
 
@@ -2134,33 +4266,67 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
             ctx.moveTo(
+
+ 
 
                 x - width * 0.28,
 
+ 
+
                 y + height * 0.20
+
+ 
 
             );
 
  
 
+ 
+
+ 
+
             ctx.lineTo(
+
+ 
 
                 x,
 
+ 
+
                 y - height * 0.22
+
+ 
 
             );
 
  
 
+ 
+
+ 
+
             ctx.lineTo(
+
+ 
 
                 x + width * 0.28,
 
+ 
+
                 y + height * 0.20
 
+ 
+
             );
+
+ 
+
+ 
 
  
 
@@ -2168,7 +4334,15 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
         }
+
+ 
+
+ 
 
  
 
@@ -2176,23 +4350,47 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
             ctx.beginPath();
+
+ 
+
+ 
 
  
 
             ctx.arc(
 
+ 
+
                 x,
+
+ 
 
                 y,
 
+ 
+
                 height * 0.11,
+
+ 
 
                 0,
 
+ 
+
                 Math.PI * 2
 
+ 
+
             );
+
+ 
+
+ 
 
  
 
@@ -2200,7 +4398,17 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
         }
+
+ 
+
+ 
+
+ 
 
  
 
@@ -2210,29 +4418,57 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
     }
 
  
 
  
 
+ 
+
+ 
+
+ 
+
     // ========================================================
+
+ 
 
     // 绘制单位
 
+ 
+
     // ========================================================
+
+ 
+
+ 
 
  
 
     drawUnits(
 
+ 
+
         units = []
+
+ 
 
     ) {
 
  
 
+ 
+
+ 
+
         const ctx =
+
+ 
 
             this.ctx;
 
@@ -2240,27 +4476,99 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
         for (
+
+ 
 
             const unit
 
+ 
+
             of units
+
+ 
 
         ) {
 
  
 
+            // ------------------------------------------------
+
+            // 阵亡单位保留在游戏数据中供胜负系统（尤其 HQ 全灭）判定，
+
+            // 但绝不继续绘制在地图上。
+
+            // ------------------------------------------------
+
+ 
+
+            const currentStrengthForRender =
+
+                Number(
+
+                    unit?.manpower ??
+
+                    unit?.strength ??
+
+                    0
+
+                );
+
+ 
+
             if (
+
+                unit?.destroyed === true ||
+
+                !Number.isFinite(currentStrengthForRender) ||
+
+                currentStrengthForRender <= 0
+
+            ) {
+
+                continue;
+
+            }
+
+ 
+
+ 
+
+ 
+
+ 
+
+            if (
+
+ 
 
                 unit.q === undefined ||
 
+ 
+
                 unit.r === undefined
+
+ 
 
             ) {
 
  
 
+ 
+
+ 
+
                 continue;
+
+ 
+
+ 
 
  
 
@@ -2270,13 +4578,27 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
             const p =
+
+ 
 
                 this.worldToScreen(
 
+ 
+
                     unit.q,
 
+ 
+
                     unit.r
+
+ 
 
                 );
 
@@ -2284,11 +4606,27 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
             const width =
+
+ 
 
                 42 *
 
+ 
+
                 this.camera.zoom;
+
+ 
+
+ 
+
+ 
 
  
 
@@ -2296,7 +4634,11 @@ export class Renderer {
 
             const height =
 
+ 
+
                 30 *
+
+ 
 
                 this.camera.zoom;
 
@@ -2304,11 +4646,23 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
             const selected =
+
+ 
 
                 this.selection &&
 
+ 
+
                 this.selection.selectedUnit ===
+
+ 
 
                 unit;
 
@@ -2316,15 +4670,33 @@ export class Renderer {
 
  
 
-            // ------------------------------------------------
+ 
 
-            // 选中框
+ 
+
+ 
 
             // ------------------------------------------------
 
  
 
+            // 选中框
+
+ 
+
+            // ------------------------------------------------
+
+ 
+
+ 
+
+ 
+
             if (selected) {
+
+ 
+
+ 
 
  
 
@@ -2334,7 +4706,15 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
                 ctx.strokeStyle =
+
+ 
 
                     "#e8c85b";
 
@@ -2342,17 +4722,39 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
                 ctx.lineWidth =
+
+ 
 
                     Math.max(
 
+ 
+
                         2,
+
+ 
 
                         3 *
 
+ 
+
                         this.camera.zoom
 
+ 
+
                     );
+
+ 
+
+ 
+
+ 
 
  
 
@@ -2362,35 +4764,73 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
                     p.x -
+
+ 
 
                     width / 2 -
 
+ 
+
                     5,
+
+ 
+
+ 
 
  
 
                     p.y -
 
+ 
+
                     height / 2 -
+
+ 
 
                     5,
 
  
 
+ 
+
+ 
+
                     width +
+
+ 
 
                     10,
 
  
 
+ 
+
+ 
+
                     height +
+
+ 
 
                     10
 
  
 
+ 
+
+ 
+
                 );
+
+ 
+
+ 
+
+ 
 
  
 
@@ -2400,17 +4840,35 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
             }
 
  
 
  
 
+ 
+
+ 
+
+ 
+
             // ------------------------------------------------
+
+ 
 
             // 单位底色
 
+ 
+
             // ------------------------------------------------
+
+ 
+
+ 
 
  
 
@@ -2420,13 +4878,31 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
             ctx.fillStyle =
+
+ 
 
                 this.factionColor(
 
+ 
+
                     unit.faction
 
+ 
+
                 );
+
+ 
+
+ 
+
+ 
 
  
 
@@ -2434,7 +4910,15 @@ export class Renderer {
 
             ctx.strokeStyle =
 
+ 
+
                 "#1c1e1b";
+
+ 
+
+ 
+
+ 
 
  
 
@@ -2442,15 +4926,31 @@ export class Renderer {
 
             ctx.lineWidth =
 
+ 
+
                 Math.max(
+
+ 
 
                     1.5,
 
+ 
+
                     2 *
+
+ 
 
                     this.camera.zoom
 
+ 
+
                 );
+
+ 
+
+ 
+
+ 
 
  
 
@@ -2460,15 +4960,31 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
                 p.x -
+
+ 
 
                 width / 2,
 
  
 
+ 
+
+ 
+
                 p.y -
 
+ 
+
                 height / 2,
+
+ 
+
+ 
 
  
 
@@ -2476,11 +4992,25 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
                 height
 
  
 
+ 
+
+ 
+
             );
+
+ 
+
+ 
+
+ 
 
  
 
@@ -2490,15 +5020,31 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
                 p.x -
+
+ 
 
                 width / 2,
 
  
 
+ 
+
+ 
+
                 p.y -
 
+ 
+
                 height / 2,
+
+ 
+
+ 
 
  
 
@@ -2506,11 +5052,25 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
                 height
 
  
 
+ 
+
+ 
+
             );
+
+ 
+
+ 
+
+ 
 
  
 
@@ -2522,11 +5082,25 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
             // ------------------------------------------------
+
+ 
 
             // 军事符号
 
+ 
+
             // ------------------------------------------------
+
+ 
+
+ 
 
  
 
@@ -2534,7 +5108,15 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
                 unit,
+
+ 
+
+ 
 
  
 
@@ -2542,7 +5124,15 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
                 p.y,
+
+ 
+
+ 
 
  
 
@@ -2550,7 +5140,15 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
                 height
+
+ 
+
+ 
 
  
 
@@ -2560,23 +5158,51 @@ export class Renderer {
 
  
 
-            // ------------------------------------------------
+ 
 
-            // 上级番号
+ 
+
+ 
 
             // ------------------------------------------------
 
  
 
+            // 上级番号
+
+ 
+
+            // ------------------------------------------------
+
+ 
+
+ 
+
+ 
+
             const regiment =
+
+ 
 
                 unit.regiment ??
 
+ 
+
                 unit.parent?.regiment ??
+
+ 
 
                 unit.parentUnit ??
 
+ 
+
                 "";
+
+ 
+
+ 
+
+ 
 
  
 
@@ -2586,7 +5212,17 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
                 ctx.save();
+
+ 
+
+ 
+
+ 
 
  
 
@@ -2594,7 +5230,15 @@ export class Renderer {
 
                 ctx.fillStyle =
 
+ 
+
                     "#4b493f";
+
+ 
+
+ 
+
+ 
 
  
 
@@ -2602,17 +5246,31 @@ export class Renderer {
 
                 ctx.font =
 
+ 
+
                     `${
+
+ 
 
                         Math.max(
 
+ 
+
                             7,
+
+ 
 
                             8 *
 
+ 
+
                             this.camera.zoom
 
+ 
+
                         )
+
+ 
 
                     }px FangSong, serif`;
 
@@ -2620,9 +5278,23 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
                 ctx.textAlign =
 
+ 
+
                     "center";
+
+ 
+
+ 
+
+ 
 
  
 
@@ -2632,7 +5304,15 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
                     String(regiment),
+
+ 
+
+ 
 
  
 
@@ -2640,11 +5320,23 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
                     p.y -
+
+ 
 
                     height / 2 -
 
+ 
+
                     4
+
+ 
+
+ 
 
  
 
@@ -2654,7 +5346,17 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
                 ctx.restore();
+
+ 
+
+ 
 
  
 
@@ -2664,53 +5366,123 @@ export class Renderer {
 
  
 
-            // ------------------------------------------------
+ 
 
-            // 实时兵力（当前 / 初始）
+ 
+
+ 
 
             // ------------------------------------------------
 
  
 
-            const currentStrength = Math.max(0, Number(unit.strength ?? unit.manpower ?? 0));
+            // 实时兵力（当前 / 初始）
 
-            const maximumStrength = Math.max(1, Number(unit.maxStrength ?? unit.maxManpower ?? currentStrength));
+ 
+
+            // ------------------------------------------------
+
+ 
+
+ 
+
+ 
+
+            const currentStrength = Math.max(
+
+                0,
+
+                Number(unit.manpower ?? unit.strength ?? 0)
+
+            );
+
+ 
+
+            const maximumStrength = Math.max(
+
+                1,
+
+                Number(unit.maxManpower ?? unit.maxStrength ?? currentStrength)
+
+            );
+
+ 
+
+ 
 
  
 
             ctx.save();
 
+ 
+
             ctx.fillStyle = "#20231f";
+
+ 
 
             ctx.font = `${Math.max(7, 8 * this.camera.zoom)}px Consolas, monospace`;
 
+ 
+
             ctx.textAlign = "center";
+
+ 
 
             ctx.textBaseline = "bottom";
 
+ 
+
             ctx.fillText(
+
+ 
 
                 `${currentStrength}/${maximumStrength}`,
 
+ 
+
                 p.x,
+
+ 
 
                 p.y - height / 2 - 3
 
+ 
+
             );
+
+ 
 
             ctx.restore();
 
  
 
-            // ------------------------------------------------
+ 
 
-            // 单位名称
+ 
 
             // ------------------------------------------------
 
  
 
+            // 单位名称
+
+ 
+
+            // ------------------------------------------------
+
+ 
+
+ 
+
+ 
+
             ctx.save();
+
+ 
+
+ 
+
+ 
 
  
 
@@ -2718,7 +5490,15 @@ export class Renderer {
 
             ctx.fillStyle =
 
+ 
+
                 "#34352f";
+
+ 
+
+ 
+
+ 
 
  
 
@@ -2726,17 +5506,31 @@ export class Renderer {
 
             ctx.font =
 
+ 
+
                 `${
+
+ 
 
                     Math.max(
 
+ 
+
                         8,
+
+ 
 
                         10 *
 
+ 
+
                         this.camera.zoom
 
+ 
+
                     )
+
+ 
 
                 }px FangSong, serif`;
 
@@ -2744,7 +5538,15 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
             ctx.textAlign =
+
+ 
 
                 "center";
 
@@ -2752,9 +5554,23 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
             ctx.textBaseline =
 
+ 
+
                 "top";
+
+ 
+
+ 
+
+ 
 
  
 
@@ -2764,9 +5580,19 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
                 unit.name ??
 
+ 
+
                 "",
+
+ 
+
+ 
 
  
 
@@ -2774,11 +5600,23 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
                 p.y +
+
+ 
 
                 height / 2 +
 
+ 
+
                 4
+
+ 
+
+ 
 
  
 
@@ -2788,11 +5626,25 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
             ctx.restore();
 
  
 
+ 
+
+ 
+
         }
+
+ 
+
+ 
 
  
 
@@ -2802,19 +5654,41 @@ export class Renderer {
 
  
 
-    // ========================================================
+ 
 
-    // 总渲染
+ 
+
+ 
 
     // ========================================================
 
  
 
+    // 总渲染
+
+ 
+
+    // ========================================================
+
+ 
+
+ 
+
+ 
+
     render(
+
+ 
 
         units = []
 
+ 
+
     ) {
+
+ 
+
+ 
 
  
 
@@ -2824,7 +5698,15 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
         // 地形
+
+ 
 
         this.drawTerrain();
 
@@ -2832,9 +5714,21 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
         // 地理要素
 
+ 
+
         this.drawRoads();
+
+ 
+
+ 
 
  
 
@@ -2842,7 +5736,15 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
         this.drawRivers();
+
+ 
+
+ 
 
  
 
@@ -2852,7 +5754,15 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
         // 移动范围必须位于单位下面
+
+ 
 
         this.drawMovementRange();
 
@@ -2860,17 +5770,37 @@ export class Renderer {
 
  
 
+ 
+
+ 
+
+ 
+
         // 单位
+
+ 
 
         this.drawUnits(
 
+ 
+
             units
+
+ 
 
         );
 
  
 
+ 
+
+ 
+
     }
+
+ 
+
+ 
 
  
 
