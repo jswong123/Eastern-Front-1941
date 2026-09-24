@@ -1,27 +1,54 @@
 // ========================================
 // MovementSystem.js
+//
 // 单位移动系统
+//
+// 当前规则：
+// 1. 不同兵种拥有不同基础移动点
+// 2. 根据地形计算移动范围
+// 3. 移动消耗行动点
+// 4. 一个六角格只能存在一个存活单位
+// 5. 已被摧毁的单位不占据格子
+// 6. 玩家与 AI 使用相同的占格规则
 // ========================================
 
-import { Pathfinding } from "./Pathfinding.js";
+
+import {
+    Pathfinding
+} from "./Pathfinding.js";
 
 
 export class MovementSystem {
 
     constructor(world) {
 
-        this.world = world;
+        this.world =
+            world;
+
 
         this.pathfinding =
-            new Pathfinding(world);
+            new Pathfinding(
+                world
+            );
 
-        this.selectedUnit = null;
+
+        this.selectedUnit =
+            null;
+
 
         this.reachable =
             new Map();
 
+
         this.previous =
             new Map();
+
+
+        // 保存当前单位列表
+        // 用于移动时进行占格检查
+
+        this.units =
+            [];
 
     }
 
@@ -64,50 +91,207 @@ export class MovementSystem {
         );
 
     }
-// ========================================
-// 检查目标格是否已有单位
-// 一格只能存在一个单位
-// ========================================
 
-isHexOccupied(q, r, units, movingUnit = null) {
-
-    if (!Array.isArray(units)) {
-        return false;
-    }
-
-    return units.some(unit => {
-
-        // 忽略正在移动的单位自己
-        if (unit === movingUnit) {
-            return false;
-        }
-
-        // 已被消灭的单位不占格
-        if (
-            unit.destroyed === true ||
-            Number(unit.strength ?? 100) <= 0
-        ) {
-            return false;
-        }
-
-        // 检查坐标
-        return (
-            Number(unit.q) === Number(q) &&
-            Number(unit.r) === Number(r)
-        );
-
-    });
-
-}
 
     // ========================================
-    // 初始化单位移动状态
+    // 判断单位是否仍然存活
+    // ========================================
+
+    isUnitAlive(unit) {
+
+        if (!unit) {
+
+            return false;
+
+        }
+
+
+        if (
+            unit.destroyed === true
+        ) {
+
+            return false;
+
+        }
+
+
+        if (
+            Number(
+                unit.strength ?? 100
+            ) <= 0
+        ) {
+
+            return false;
+
+        }
+
+
+        return true;
+
+    }
+
+
+    // ========================================
+    // 检查某格是否已经存在单位
+    //
+    // 一格只能存在一个存活单位
+    // ========================================
+
+    isHexOccupied(
+        q,
+        r,
+        units = this.units,
+        movingUnit = null
+    ) {
+
+        if (
+            !Array.isArray(units)
+        ) {
+
+            return false;
+
+        }
+
+
+        return units.some(
+            unit => {
+
+                // ----------------------------
+                // 忽略空单位
+                // ----------------------------
+
+                if (!unit) {
+
+                    return false;
+
+                }
+
+
+                // ----------------------------
+                // 忽略正在移动的单位自己
+                // ----------------------------
+
+                if (
+                    unit ===
+                    movingUnit
+                ) {
+
+                    return false;
+
+                }
+
+
+                // ----------------------------
+                // 已被摧毁的单位不占格
+                // ----------------------------
+
+                if (
+                    !this.isUnitAlive(
+                        unit
+                    )
+                ) {
+
+                    return false;
+
+                }
+
+
+                // ----------------------------
+                // 检查坐标
+                // ----------------------------
+
+                return (
+                    Number(unit.q) ===
+                        Number(q) &&
+                    Number(unit.r) ===
+                        Number(r)
+                );
+
+            }
+        );
+
+    }
+
+
+    // ========================================
+    // 获取某格上的单位
+    //
+    // 后续战斗、UI、堆叠检测都可以使用
+    // ========================================
+
+    getUnitAt(
+        q,
+        r,
+        units = this.units,
+        ignoreUnit = null
+    ) {
+
+        if (
+            !Array.isArray(units)
+        ) {
+
+            return null;
+
+        }
+
+
+        return (
+            units.find(
+                unit => {
+
+                    if (!unit) {
+
+                        return false;
+
+                    }
+
+
+                    if (
+                        unit ===
+                        ignoreUnit
+                    ) {
+
+                        return false;
+
+                    }
+
+
+                    if (
+                        !this.isUnitAlive(
+                            unit
+                        )
+                    ) {
+
+                        return false;
+
+                    }
+
+
+                    return (
+                        Number(unit.q) ===
+                            Number(q) &&
+                        Number(unit.r) ===
+                            Number(r)
+                    );
+
+                }
+            ) ??
+            null
+        );
+
+    }
+
+
+    // ========================================
+    // 确保单位存在移动状态
     // ========================================
 
     initializeUnit(unit) {
 
         if (!unit) {
+
             return;
+
         }
 
 
@@ -117,7 +301,9 @@ isHexOccupied(q, r, units, movingUnit = null) {
         ) {
 
             unit.maxMovementPoints =
-                this.getBaseMovement(unit);
+                this.getBaseMovement(
+                    unit
+                );
 
         }
 
@@ -136,7 +322,7 @@ isHexOccupied(q, r, units, movingUnit = null) {
 
 
     // ========================================
-    // 选择单位
+    // 选择移动单位
     // ========================================
 
     selectUnit(
@@ -147,10 +333,17 @@ isHexOccupied(q, r, units, movingUnit = null) {
         this.clear();
 
 
+        if (!unit) {
+
+            return;
+
+        }
+
+
         if (
-            !unit ||
-            unit.destroyed ||
-            (unit.strength ?? 1) <= 0
+            !this.isUnitAlive(
+                unit
+            )
         ) {
 
             return;
@@ -158,21 +351,32 @@ isHexOccupied(q, r, units, movingUnit = null) {
         }
 
 
-        this.initializeUnit(unit);
+        // ====================================
+        // 保存当前完整单位列表
+        // ====================================
+
+        if (
+            Array.isArray(units)
+        ) {
+
+            this.units =
+                units;
+
+        }
+
+
+        this.initializeUnit(
+            unit
+        );
 
 
         this.selectedUnit =
             unit;
 
 
-        if (
-            unit.movementPoints <= 0
-        ) {
-
-            return;
-
-        }
-
+        // ====================================
+        // 计算基础可移动范围
+        // ====================================
 
         const result =
             this.pathfinding
@@ -194,29 +398,116 @@ isHexOccupied(q, r, units, movingUnit = null) {
         this.previous =
             result.previous;
 
+
+        // ====================================
+        // 删除已经被单位占据的目标格
+        //
+        // 这样这些格子不会显示为
+        // “可以移动”的高亮格。
+        // ====================================
+
+        for (
+            const key
+            of Array.from(
+                this.reachable.keys()
+            )
+        ) {
+
+            const parts =
+                key.split(",");
+
+
+            const q =
+                Number(
+                    parts[0]
+                );
+
+
+            const r =
+                Number(
+                    parts[1]
+                );
+
+
+            if (
+                this.isHexOccupied(
+                    q,
+                    r,
+                    units,
+                    unit
+                )
+            ) {
+
+                this.reachable.delete(
+                    key
+                );
+
+            }
+
+        }
+
     }
 
 
     // ========================================
-    // 是否可以移动到目标格
+    // 是否可以移动到某格
     // ========================================
 
-    canMoveTo(q, r) {
+    canMoveTo(
+        q,
+        r,
+        units = this.units
+    ) {
 
-        if (!this.selectedUnit) {
+        if (
+            !this.selectedUnit
+        ) {
+
             return false;
+
         }
 
 
-        return this.reachable.has(
-            `${q},${r}`
-        );
+        // ====================================
+        // 首先必须属于可移动范围
+        // ====================================
+
+        if (
+            !this.reachable.has(
+                `${q},${r}`
+            )
+        ) {
+
+            return false;
+
+        }
+
+
+        // ====================================
+        // 然后检查目标格是否被占据
+        // ====================================
+
+        if (
+            this.isHexOccupied(
+                q,
+                r,
+                units,
+                this.selectedUnit
+            )
+        ) {
+
+            return false;
+
+        }
+
+
+        return true;
 
     }
 
 
     // ========================================
-    // 获取移动成本
+    // 移动成本
     // ========================================
 
     getMoveCost(q, r) {
@@ -238,21 +529,15 @@ isHexOccupied(q, r, units, movingUnit = null) {
     moveTo(
         q,
         r,
-        units = []
+        units = this.units
     ) {
 
-        if (!this.selectedUnit) {
-
-            return null;
-
-        }
-
+        // ====================================
+        // 没有选中单位
+        // ====================================
 
         if (
-            !this.canMoveTo(
-                q,
-                r
-            )
+            !this.selectedUnit
         ) {
 
             return null;
@@ -264,8 +549,80 @@ isHexOccupied(q, r, units, movingUnit = null) {
             this.selectedUnit;
 
 
-        this.initializeUnit(unit);
+        // ====================================
+        // 单位已经被摧毁
+        // ====================================
 
+        if (
+            !this.isUnitAlive(
+                unit
+            )
+        ) {
+
+            return null;
+
+        }
+
+
+        // ====================================
+        // 再次检查目标格
+        //
+        // 即使 UI 出现异常，
+        // 这里也会阻止单位重叠。
+        // ====================================
+
+        if (
+            this.isHexOccupied(
+                q,
+                r,
+                units,
+                unit
+            )
+        ) {
+
+            console.log(
+                `[移动] 目标格 (${q}, ${r}) 已有单位，禁止进入`
+            );
+
+
+            return {
+
+                success: false,
+
+                reason:
+                    "occupied",
+
+                unit,
+
+                q,
+
+                r
+
+            };
+
+        }
+
+
+        // ====================================
+        // 检查是否属于可移动范围
+        // ====================================
+
+        if (
+            !this.canMoveTo(
+                q,
+                r,
+                units
+            )
+        ) {
+
+            return null;
+
+        }
+
+
+        // ====================================
+        // 获取移动成本
+        // ====================================
 
         const cost =
             this.getMoveCost(
@@ -275,15 +632,17 @@ isHexOccupied(q, r, units, movingUnit = null) {
 
 
         if (
-            cost === null ||
-            cost >
-            unit.movementPoints
+            cost === null
         ) {
 
             return null;
 
         }
 
+
+        // ====================================
+        // 构建移动路径
+        // ====================================
 
         const path =
             this.pathfinding
@@ -309,27 +668,78 @@ isHexOccupied(q, r, units, movingUnit = null) {
         }
 
 
+        // ====================================
+        // 保存移动前位置
+        // ====================================
+
         const from = {
 
-            q: unit.q,
+            q:
+                unit.q,
 
-            r: unit.r
+            r:
+                unit.r
 
         };
 
 
-        // ========================================
-        // 修改单位位置
-        // ========================================
+        // ====================================
+        // 最后一次占格检查
+        //
+        // 防止在未来加入动画、
+        // AI异步行动等机制后产生重叠。
+        // ====================================
 
-        unit.q = q;
+        if (
+            this.isHexOccupied(
+                q,
+                r,
+                units,
+                unit
+            )
+        ) {
 
-        unit.r = r;
+            console.log(
+                `[移动] 移动取消：(${q}, ${r}) 已被其他单位占据`
+            );
 
 
-        // ========================================
-        // 扣除实际移动点
-        // ========================================
+            return {
+
+                success: false,
+
+                reason:
+                    "occupied",
+
+                unit,
+
+                from,
+
+                to: {
+                    q,
+                    r
+                }
+
+            };
+
+        }
+
+
+        // ====================================
+        // 正式移动单位
+        // ====================================
+
+        unit.q =
+            q;
+
+
+        unit.r =
+            r;
+
+
+        // ====================================
+        // 扣除移动点
+        // ====================================
 
         unit.movementPoints =
             Math.max(
@@ -342,7 +752,14 @@ isHexOccupied(q, r, units, movingUnit = null) {
             );
 
 
+        // ====================================
+        // 移动结果
+        // ====================================
+
         const result = {
+
+            success:
+                true,
 
             unit,
 
@@ -355,34 +772,35 @@ isHexOccupied(q, r, units, movingUnit = null) {
 
             cost,
 
-            path,
-
-            remainingMovement:
-                unit.movementPoints
+            path
 
         };
 
 
-        // ========================================
-        // 移动后重新计算剩余移动范围
-        // ========================================
+        console.log(
 
-        if (
-            unit.movementPoints > 0
-        ) {
+            `玩家移动成功: ${unit.id ?? unit.name ?? unit.type} ` +
+            `从 (${from.q}, ${from.r}) ` +
+            `移动到 (${q}, ${r}) ` +
+            `消耗: ${cost} ` +
+            `剩余行动点: ${unit.movementPoints}`
 
-            this.selectUnit(
-                unit,
-                units
-            );
+        );
 
-        }
 
-        else {
+        // ====================================
+        // 移动之后重新计算
+        // 剩余移动范围
+        //
+        // 重要：
+        // 必须继续传入 units，
+        // 否则占格系统会失去其他单位信息。
+        // ====================================
 
-            this.clear();
-
-        }
+        this.selectUnit(
+            unit,
+            units
+        );
 
 
         return result;
@@ -407,19 +825,35 @@ isHexOccupied(q, r, units, movingUnit = null) {
         this.previous =
             new Map();
 
+
+        // 注意：
+        // 不清除 this.units。
+        //
+        // 因为 this.units 保存的是当前战场
+        // 单位列表，后续移动仍然需要它。
+
     }
 
 
     // ========================================
-    // 新行动阶段恢复单位移动点
+    // 新回合恢复单个单位移动点
     // ========================================
 
     resetUnit(unit) {
 
+        if (!unit) {
+
+            return;
+
+        }
+
+
+        // 已被摧毁单位无需恢复行动点
+
         if (
-            !unit ||
-            unit.destroyed ||
-            (unit.strength ?? 1) <= 0
+            !this.isUnitAlive(
+                unit
+            )
         ) {
 
             return;
@@ -427,7 +861,9 @@ isHexOccupied(q, r, units, movingUnit = null) {
         }
 
 
-        this.initializeUnit(unit);
+        this.initializeUnit(
+            unit
+        );
 
 
         unit.movementPoints =
@@ -437,7 +873,7 @@ isHexOccupied(q, r, units, movingUnit = null) {
 
 
     // ========================================
-    // 恢复整个阵营移动点
+    // 新回合恢复整个阵营移动点
     // ========================================
 
     resetFaction(
@@ -445,18 +881,34 @@ isHexOccupied(q, r, units, movingUnit = null) {
         faction
     ) {
 
+        if (
+            !Array.isArray(units)
+        ) {
+
+            return;
+
+        }
+
+
+        // 更新当前战场单位列表
+
+        this.units =
+            units;
+
+
         for (
             const unit
             of units
         ) {
 
             if (
-                unit.faction === faction &&
-                !unit.destroyed &&
-                (unit.strength ?? 1) > 0
+                unit.faction ===
+                faction
             ) {
 
-                this.resetUnit(unit);
+                this.resetUnit(
+                    unit
+                );
 
             }
 
