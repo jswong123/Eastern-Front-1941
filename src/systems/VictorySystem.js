@@ -4,8 +4,9 @@
 //
 // 支持：
 // 1. 消灭敌方全部有效作战单位
-// 2. 进攻方在规定时间内占领战略目标
-// 3. 防守方坚持到规定时间并守住战略目标
+// 2. 消灭敌方全部指挥单位
+// 3. 德军在规定时间内占领战略目标
+// 4. 苏军坚持到规定时间并守住战略目标
 //
 // 阵营统一：
 // german
@@ -39,7 +40,6 @@ export class VictorySystem {
                 .trim()
                 .toLowerCase();
 
-
         if (
             value === "ger" ||
             value === "german" ||
@@ -51,7 +51,6 @@ export class VictorySystem {
             return "german";
 
         }
-
 
         if (
             value === "sov" ||
@@ -65,7 +64,6 @@ export class VictorySystem {
             return "soviet";
 
         }
-
 
         return value;
 
@@ -101,7 +99,6 @@ export class VictorySystem {
 
         }
 
-
         return (
 
             unit.destroyed !== true &&
@@ -118,7 +115,9 @@ export class VictorySystem {
     // ========================================================
     // 是否属于有效作战单位
     //
-    // 司令部不参与“全军覆没”判定。
+    // 注意：
+    // 司令部不参与普通“全军覆没”判定。
+    // 司令部拥有独立的胜利判定。
     // ========================================================
 
     isCombatUnit(unit) {
@@ -131,14 +130,12 @@ export class VictorySystem {
 
         }
 
-
         const type =
             String(
                 unit.type ?? ""
             )
                 .trim()
                 .toLowerCase();
-
 
         return (
             type !== "headquarters" &&
@@ -162,7 +159,6 @@ export class VictorySystem {
                 faction
             );
 
-
         return units.filter(
 
             unit =>
@@ -171,6 +167,86 @@ export class VictorySystem {
 
                 this.getUnitSide(unit) ===
                     side
+
+        );
+
+    }
+
+
+    // ========================================================
+    // 获取某阵营的全部指挥单位
+    //
+    // 注意：
+    // 这里包括已经被摧毁的指挥单位。
+    // 因为我们需要判断“是否全部被摧毁”。
+    // ========================================================
+
+    getHeadquartersUnits(
+        units,
+        faction
+    ) {
+
+        const side =
+            this.normalizeSide(
+                faction
+            );
+
+        return units.filter(unit => {
+
+            const type =
+                String(
+                    unit?.type ?? ""
+                )
+                    .trim()
+                    .toLowerCase();
+
+            return (
+
+                this.getUnitSide(unit) === side &&
+
+                (
+                    type === "headquarters" ||
+                    type === "hq"
+                )
+
+            );
+
+        });
+
+    }
+
+
+    // ========================================================
+    // 判断某阵营所有指挥单位是否已经被消灭
+    //
+    // 保护逻辑：
+    // 如果某阵营从一开始就没有任何HQ，
+    // 不会因此自动判负。
+    // ========================================================
+
+    allHeadquartersDestroyed(
+        units,
+        faction
+    ) {
+
+        const headquarters =
+            this.getHeadquartersUnits(
+                units,
+                faction
+            );
+
+        if (
+            headquarters.length === 0
+        ) {
+
+            return false;
+
+        }
+
+        return headquarters.every(
+
+            unit =>
+                !this.isAlive(unit)
 
         );
 
@@ -211,7 +287,7 @@ export class VictorySystem {
     // 该战略格上存在该阵营存活单位
     // 即视为控制。
     //
-    // 因为你现在已经实行“一格一单位”，
+    // 因为目前实行“一格一单位”，
     // 所以不会产生双方同时控制的问题。
     // ========================================================
 
@@ -227,7 +303,6 @@ export class VictorySystem {
 
         }
 
-
         const unit =
             this.getUnitAt(
                 units,
@@ -235,13 +310,11 @@ export class VictorySystem {
                 objective.r
             );
 
-
         if (!unit) {
 
             return false;
 
         }
-
 
         return (
 
@@ -269,7 +342,6 @@ export class VictorySystem {
                 objective.r
             );
 
-
         if (!unit) {
 
             return {
@@ -283,7 +355,6 @@ export class VictorySystem {
             };
 
         }
-
 
         return {
 
@@ -329,10 +400,8 @@ export class VictorySystem {
 
         }
 
-
         const objectives =
             objectiveRule.objectives;
-
 
         const results =
             objectives.map(
@@ -347,7 +416,6 @@ export class VictorySystem {
 
             );
 
-
         if (
             objectiveRule.mode ===
             "any"
@@ -356,7 +424,6 @@ export class VictorySystem {
             return results.some(Boolean);
 
         }
-
 
         // 默认 all
 
@@ -368,9 +435,13 @@ export class VictorySystem {
     // ========================================================
     // 是否已经到达截止回合
     //
-    // deadlineTurn = 12
+    // deadlineTurn 来自 scenario.json
     //
-    // 表示第12回合结束时进行最终判定。
+    // 例如：
+    //
+    // "deadlineTurn": 92
+    //
+    // 表示第92回合结束以后进行最终判定。
     // ========================================================
 
     deadlineReached(
@@ -384,7 +455,6 @@ export class VictorySystem {
                 victoryConditions?.deadlineTurn
             );
 
-
         if (
             !Number.isFinite(
                 deadlineTurn
@@ -395,7 +465,6 @@ export class VictorySystem {
 
         }
 
-
         if (
             Number(turn) >
             deadlineTurn
@@ -404,7 +473,6 @@ export class VictorySystem {
             return true;
 
         }
-
 
         /*
          * 一个完整回合：
@@ -415,13 +483,14 @@ export class VictorySystem {
          * →
          * 下一回合
          *
-         * 所以第12回合苏军阶段结束后，
-         * TurnSystem 通常会进入第13回合。
+         * 因此：
          *
-         * 因此 turn > deadlineTurn
-         * 是最安全的最终截止判断。
+         * deadlineTurn = 92
+         *
+         * 第92回合苏军阶段结束以后，
+         * TurnSystem进入第93回合，
+         * 此时进行最终截止判定。
          */
-
 
         return false;
 
@@ -446,7 +515,6 @@ export class VictorySystem {
 
         this.reason =
             reason ?? "";
-
 
         return this.getResult();
 
@@ -473,7 +541,6 @@ export class VictorySystem {
 
         }
 
-
         const victoryConditions =
             this.scenario
                 ?.victoryConditions ??
@@ -490,7 +557,6 @@ export class VictorySystem {
                 "german"
             );
 
-
         const sovietUnits =
             this.getCombatUnits(
                 units,
@@ -499,7 +565,7 @@ export class VictorySystem {
 
 
         // ====================================================
-        // 2. 德军被全歼
+        // 2. 德军全部有效作战单位被消灭
         // ====================================================
 
         if (
@@ -518,7 +584,7 @@ export class VictorySystem {
 
 
         // ====================================================
-        // 3. 苏军被全歼
+        // 3. 苏军全部有效作战单位被消灭
         // ====================================================
 
         if (
@@ -537,13 +603,64 @@ export class VictorySystem {
 
 
         // ====================================================
-        // 4. 德军战略目标
+        // 4. 德军全部指挥单位被消灭
+        //
+        // 德军所有 headquarters / hq
+        // 全部失去战斗能力时：
+        // 苏军立即获胜。
+        // ====================================================
+
+        if (
+            this.allHeadquartersDestroyed(
+                units,
+                "german"
+            )
+        ) {
+
+            return this.setVictory(
+
+                "soviet",
+
+                "德军全部指挥单位已被消灭，苏军取得胜利"
+
+            );
+
+        }
+
+
+        // ====================================================
+        // 5. 苏军全部指挥单位被消灭
+        //
+        // 苏军所有 headquarters / hq
+        // 全部失去战斗能力时：
+        // 德军立即获胜。
+        // ====================================================
+
+        if (
+            this.allHeadquartersDestroyed(
+                units,
+                "soviet"
+            )
+        ) {
+
+            return this.setVictory(
+
+                "german",
+
+                "苏军全部指挥单位已被消灭，德军取得胜利"
+
+            );
+
+        }
+
+
+        // ====================================================
+        // 6. 德军战略目标
         // ====================================================
 
         const germanRule =
             victoryConditions.german ??
             {};
-
 
         const captureRule =
             germanRule.captureObjectives;
@@ -576,7 +693,7 @@ export class VictorySystem {
 
 
         // ====================================================
-        // 5. 截止时间
+        // 7. 截止时间
         // ====================================================
 
         const deadline =
@@ -596,7 +713,6 @@ export class VictorySystem {
             const sovietRule =
                 victoryConditions.soviet ??
                 {};
-
 
             const defendRule =
                 sovietRule
@@ -618,7 +734,6 @@ export class VictorySystem {
                         defendRule
                     );
 
-
                 if (defended) {
 
                     return this.setVictory(
@@ -636,7 +751,7 @@ export class VictorySystem {
 
 
             /*
-             * 如果设置了德军目标，
+             * 如果设置了德军占领目标，
              * 但截止时间仍未满足，
              * 默认判苏军防御成功。
              */
@@ -659,7 +774,7 @@ export class VictorySystem {
 
 
         // ====================================================
-        // 6. 战斗继续
+        // 8. 战斗继续
         // ====================================================
 
         return {
