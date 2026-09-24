@@ -64,7 +64,41 @@ export class MovementSystem {
         );
 
     }
+// ========================================
+// 检查目标格是否已有单位
+// 一格只能存在一个单位
+// ========================================
 
+isHexOccupied(q, r, units, movingUnit = null) {
+
+    if (!Array.isArray(units)) {
+        return false;
+    }
+
+    return units.some(unit => {
+
+        // 忽略正在移动的单位自己
+        if (unit === movingUnit) {
+            return false;
+        }
+
+        // 已被消灭的单位不占格
+        if (
+            unit.destroyed === true ||
+            Number(unit.strength ?? 100) <= 0
+        ) {
+            return false;
+        }
+
+        // 检查坐标
+        return (
+            Number(unit.q) === Number(q) &&
+            Number(unit.r) === Number(r)
+        );
+
+    });
+
+}
 
     // ========================================
     // 初始化单位移动状态
