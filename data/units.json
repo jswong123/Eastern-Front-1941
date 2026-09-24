@@ -10,7 +10,7 @@
 
       "id": "GER_PZ_01",
 
-      "name": "德军第11装甲营",
+      "name": "第11装甲营",
 
       "faction": "german",
 
@@ -58,7 +58,7 @@
 
       "id": "GER_PZ_02",
 
-      "name": "德军第13装甲营",
+      "name": "第13装甲营",
 
       "faction": "german",
 
@@ -106,7 +106,7 @@
 
       "id": "GER_PZ_03",
 
-      "name": "德军第14装甲营",
+      "name": "第14装甲营",
 
       "faction": "german",
 
@@ -154,7 +154,7 @@
 
       "id": "GER_MOT_01",
 
-      "name": "德军第16摩托化步兵营",
+      "name": "第16摩托化步兵营",
 
       "faction": "german",
 
@@ -202,7 +202,7 @@
 
       "id": "GER_MOT_02",
 
-      "name": "德军第25摩托化步兵营",
+      "name": "第25摩托化步兵营",
 
       "faction": "german",
 
@@ -250,7 +250,7 @@
 
       "id": "GER_INF_01",
 
-      "name": "德军第57步兵营",
+      "name": "第57步兵营",
 
       "faction": "german",
 
@@ -298,7 +298,7 @@
 
       "id": "GER_INF_02",
 
-      "name": "德军第75步兵营",
+      "name": "第75步兵营",
 
       "faction": "german",
 
@@ -346,7 +346,7 @@
 
       "id": "GER_ART_01",
 
-      "name": "德军炮兵第1营",
+      "name": "炮兵第1营",
 
       "faction": "german",
 
@@ -394,7 +394,7 @@
 
       "id": "GER_AT_01",
 
-      "name": "德军反坦克第1连",
+      "name": "反坦克第1连",
 
       "faction": "german",
 
@@ -442,7 +442,7 @@
 
       "id": "GER_REC_01",
 
-      "name": "德军装甲侦察连",
+      "name": "装甲侦察连",
 
       "faction": "german",
 
@@ -490,7 +490,7 @@
 
       "id": "GER_ENG_01",
 
-      "name": "德军工兵第1连",
+      "name": "工兵第1连",
 
       "faction": "german",
 
@@ -538,7 +538,7 @@
 
       "id": "GER_HQ_01",
 
-      "name": "德军第1装甲集群司令部连",
+      "name": "第1装甲集群司令部",
 
       "faction": "german",
 
@@ -586,7 +586,7 @@
 
       "id": "SOV_TANK_01",
 
-      "name": "苏军第8坦克营",
+      "name": "第8坦克营",
 
       "faction": "soviet",
 
@@ -634,7 +634,7 @@
 
       "id": "SOV_TANK_02",
 
-      "name": "苏军第10坦克营",
+      "name": "第10坦克营",
 
       "faction": "soviet",
 
@@ -682,7 +682,7 @@
 
       "id": "SOV_TANK_03",
 
-      "name": "苏军第12坦克营",
+      "name": "第12坦克营",
 
       "faction": "soviet",
 
@@ -730,7 +730,7 @@
 
       "id": "SOV_TANK_04",
 
-      "name": "苏军第32坦克营",
+      "name": "第32坦克营",
 
       "faction": "soviet",
 
@@ -778,7 +778,7 @@
 
       "id": "SOV_MOT_01",
 
-      "name": "苏军第7摩托化步兵营",
+      "name": "第7摩托化步兵营",
 
       "faction": "soviet",
 
@@ -826,7 +826,7 @@
 
       "id": "SOV_MOT_02",
 
-      "name": "苏军第81摩托化步兵营",
+      "name": "第81摩托化步兵营",
 
       "faction": "soviet",
 
@@ -874,7 +874,7 @@
 
       "id": "SOV_INF_01",
 
-      "name": "苏军第87步兵营",
+      "name": "第87步兵营",
 
       "faction": "soviet",
 
@@ -922,7 +922,7 @@
 
       "id": "SOV_INF_02",
 
-      "name": "苏军第124步兵营",
+      "name": "第124步兵营",
 
       "faction": "soviet",
 
@@ -970,7 +970,7 @@
 
       "id": "SOV_INF_03",
 
-      "name": "苏军第135步兵营",
+      "name": "第135步兵营",
 
       "faction": "soviet",
 
@@ -1018,7 +1018,7 @@
 
       "id": "SOV_ART_01",
 
-      "name": "苏军炮兵第1营",
+      "name": "炮兵第1营",
 
       "faction": "soviet",
 
@@ -1066,7 +1066,7 @@
 
       "id": "SOV_ART_02",
 
-      "name": "苏军炮兵第2营",
+      "name": "炮兵第2营",
 
       "faction": "soviet",
 
@@ -1114,7 +1114,7 @@
 
       "id": "SOV_AT_01",
 
-      "name": "苏军反坦克第1连",
+      "name": "反坦克第1连",
 
       "faction": "soviet",
 
@@ -1162,7 +1162,7 @@
 
       "id": "SOV_REC_01",
 
-      "name": "苏军侦察连",
+      "name": "侦察连",
 
       "faction": "soviet",
 
@@ -1210,7 +1210,7 @@
 
       "id": "SOV_ENG_01",
 
-      "name": "苏军工兵第1连",
+      "name": "工兵第1连",
 
       "faction": "soviet",
 
@@ -1258,7 +1258,7 @@
 
       "id": "SOV_HQ_01",
 
-      "name": "苏军第8机械化军司令部连",
+      "name": "第8机械化军司令部",
 
       "faction": "soviet",
 
@@ -1306,7 +1306,7 @@
 
       "id": "GER_INF_03",
 
-      "name": "德军第3步兵营",
+      "name": "第3步兵营",
 
       "faction": "german",
 
@@ -1354,7 +1354,7 @@
 
       "id": "GER_INF_04",
 
-      "name": "德军第4步兵营",
+      "name": "第4步兵营",
 
       "faction": "german",
 
@@ -1402,7 +1402,7 @@
 
       "id": "GER_INF_05",
 
-      "name": "德军第5步兵营",
+      "name": "第5步兵营",
 
       "faction": "german",
 
@@ -1450,7 +1450,7 @@
 
       "id": "GER_INF_06",
 
-      "name": "德军第6步兵营",
+      "name": "第6步兵营",
 
       "faction": "german",
 
@@ -1498,7 +1498,7 @@
 
       "id": "GER_MOT_03",
 
-      "name": "德军第3摩托化步兵营",
+      "name": "第3摩托化步兵营",
 
       "faction": "german",
 
@@ -1546,7 +1546,7 @@
 
       "id": "GER_MOT_04",
 
-      "name": "德军第4摩托化步兵营",
+      "name": "第4摩托化步兵营",
 
       "faction": "german",
 
@@ -1594,7 +1594,7 @@
 
       "id": "GER_MOT_05",
 
-      "name": "德军第5摩托化步兵营",
+      "name": "第5摩托化步兵营",
 
       "faction": "german",
 
@@ -1642,7 +1642,7 @@
 
       "id": "GER_PZ_04",
 
-      "name": "德军第4装甲营",
+      "name": "第4装甲营",
 
       "faction": "german",
 
@@ -1690,7 +1690,7 @@
 
       "id": "GER_PZ_05",
 
-      "name": "德军第5装甲营",
+      "name": "第5装甲营",
 
       "faction": "german",
 
@@ -1738,7 +1738,7 @@
 
       "id": "GER_ART_02",
 
-      "name": "德军第2炮兵营",
+      "name": "第2炮兵营",
 
       "faction": "german",
 
@@ -1786,7 +1786,7 @@
 
       "id": "GER_ART_03",
 
-      "name": "德军第3炮兵营",
+      "name": "第3炮兵营",
 
       "faction": "german",
 
@@ -1834,7 +1834,7 @@
 
       "id": "GER_AT_02",
 
-      "name": "德军第2反坦克连",
+      "name": "第2反坦克连",
 
       "faction": "german",
 
@@ -1882,7 +1882,7 @@
 
       "id": "GER_AT_03",
 
-      "name": "德军第3反坦克连",
+      "name": "第3反坦克连",
 
       "faction": "german",
 
@@ -1930,7 +1930,7 @@
 
       "id": "GER_REC_02",
 
-      "name": "德军第2侦察连",
+      "name": "第2侦察连",
 
       "faction": "german",
 
@@ -1978,7 +1978,7 @@
 
       "id": "GER_REC_03",
 
-      "name": "德军第3侦察连",
+      "name": "第3侦察连",
 
       "faction": "german",
 
@@ -2026,7 +2026,7 @@
 
       "id": "GER_ENG_02",
 
-      "name": "德军第2工兵连",
+      "name": "第2工兵连",
 
       "faction": "german",
 
@@ -2074,7 +2074,7 @@
 
       "id": "GER_ENG_03",
 
-      "name": "德军第3工兵连",
+      "name": "第3工兵连",
 
       "faction": "german",
 
@@ -2122,7 +2122,7 @@
 
       "id": "GER_HQ_02",
 
-      "name": "德军第2司令部连",
+      "name": "第2司令部",
 
       "faction": "german",
 
@@ -2170,7 +2170,7 @@
 
       "id": "SOV_INF_04",
 
-      "name": "苏军第4步兵营",
+      "name": "第4步兵营",
 
       "faction": "soviet",
 
@@ -2218,7 +2218,7 @@
 
       "id": "SOV_INF_05",
 
-      "name": "苏军第5步兵营",
+      "name": "第5步兵营",
 
       "faction": "soviet",
 
@@ -2266,7 +2266,7 @@
 
       "id": "SOV_INF_06",
 
-      "name": "苏军第6步兵营",
+      "name": "第6步兵营",
 
       "faction": "soviet",
 
@@ -2314,7 +2314,7 @@
 
       "id": "SOV_INF_07",
 
-      "name": "苏军第7步兵营",
+      "name": "第7步兵营",
 
       "faction": "soviet",
 
@@ -2362,7 +2362,7 @@
 
       "id": "SOV_INF_08",
 
-      "name": "苏军第8步兵营",
+      "name": "第8步兵营",
 
       "faction": "soviet",
 
@@ -2410,7 +2410,7 @@
 
       "id": "SOV_TANK_05",
 
-      "name": "苏军第5坦克营",
+      "name": "第5坦克营",
 
       "faction": "soviet",
 
@@ -2458,7 +2458,7 @@
 
       "id": "SOV_TANK_06",
 
-      "name": "苏军第6坦克营",
+      "name": "第6坦克营",
 
       "faction": "soviet",
 
@@ -2506,7 +2506,7 @@
 
       "id": "SOV_MOT_03",
 
-      "name": "苏军第3摩托化步兵营",
+      "name": "第3摩托化步兵营",
 
       "faction": "soviet",
 
@@ -2554,7 +2554,7 @@
 
       "id": "SOV_MOT_04",
 
-      "name": "苏军第4摩托化步兵营",
+      "name": "第4摩托化步兵营",
 
       "faction": "soviet",
 
@@ -2602,7 +2602,7 @@
 
       "id": "SOV_ART_03",
 
-      "name": "苏军第3炮兵营",
+      "name": "第3炮兵营",
 
       "faction": "soviet",
 
@@ -2650,7 +2650,7 @@
 
       "id": "SOV_ART_04",
 
-      "name": "苏军第4炮兵营",
+      "name": "第4炮兵营",
 
       "faction": "soviet",
 
@@ -2698,7 +2698,7 @@
 
       "id": "SOV_AT_02",
 
-      "name": "苏军第2反坦克连",
+      "name": "第2反坦克连",
 
       "faction": "soviet",
 
@@ -2746,7 +2746,7 @@
 
       "id": "SOV_REC_02",
 
-      "name": "苏军第2侦察连",
+      "name": "第2侦察连",
 
       "faction": "soviet",
 
@@ -2794,7 +2794,7 @@
 
       "id": "SOV_ENG_02",
 
-      "name": "苏军第2工兵连",
+      "name": "第2工兵连",
 
       "faction": "soviet",
 
@@ -2842,7 +2842,7 @@
 
       "id": "SOV_HQ_02",
 
-      "name": "苏军第2司令部连",
+      "name": "第2司令部",
 
       "faction": "soviet",
 
