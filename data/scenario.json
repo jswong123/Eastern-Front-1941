@@ -1,141 +1,73 @@
 {
-    "scenario": "Dubno 1941 Prototype",
+  "id": "dubno_1941",
 
-    "date": "1941-06-26",
+  "scenario": "杜布诺战役",
 
-    "units": [
+  "date": "1941-06-26",
 
-        {
-            "id": "GER_PZ_01",
+  "startTime": "08:00",
 
-            "side": "germany",
+  "hoursPerTurn": 2,
 
-            "type": "armor",
+  "startingPhase": "german",
 
-            "level": "platoon",
+  "victoryConditions": {
 
-            "regiment": "装15",
+    "deadlineTurn": 12,
 
-            "shortName": "1连1排",
+    "german": {
 
-            "equipment": "Panzer III",
+      "eliminateEnemy": true,
 
-            "operational": 5,
+      "captureObjectives": {
 
-            "maximum": 5,
+        "mode": "all",
 
-            "q": 13,
-            "r": 12
-        },
+        "successText": "德军在规定时间内成功占领杜布诺",
 
-        {
-            "id": "GER_INF_01",
+        "objectives": [
 
-            "side": "germany",
-
-            "type": "infantry",
-
-            "level": "company",
-
-            "regiment": "步110",
-
-            "shortName": "第1连",
-
-            "personnel": 154,
-
-            "maximum": 162,
-
-            "q": 11,
-            "r": 14
-        },
-
-        {
-            "id": "GER_INF_02",
-
-            "side": "germany",
-
-            "type": "infantry",
-
-            "level": "company",
-
-            "regiment": "步110",
-
-            "shortName": "第2连",
-
-            "personnel": 147,
-
-            "maximum": 162,
-
-            "q": 12,
-            "r": 15
-        },
-
-        {
-            "id": "SOV_TANK_01",
-
-            "side": "soviet",
-
-            "type": "armor",
-
-            "level": "platoon",
-
-            "regiment": "坦86",
-
-            "shortName": "1连1排",
-
-            "equipment": "T-26",
-
-            "operational": 5,
-
-            "maximum": 5,
-
-            "q": 28,
+          {
+            "id": "dubno",
+            "name": "杜布诺",
+            "q": 31,
             "r": 13
-        },
+          }
 
-        {
-            "id": "SOV_INF_01",
+        ]
 
-            "side": "soviet",
+      }
 
-            "type": "infantry",
+    },
 
-            "level": "company",
+    "soviet": {
 
-            "regiment": "步XX",
+      "eliminateEnemy": true,
 
-            "shortName": "第1连",
+      "defendObjectivesUntilDeadline": {
 
-            "personnel": 151,
+        "mode": "all",
 
-            "maximum": 160,
+        "successText": "苏军成功坚守杜布诺至规定时间",
 
-            "q": 27,
-            "r": 15
-        },
+        "objectives": [
 
-        {
-            "id": "SOV_ART_01",
+          {
+            "id": "dubno",
+            "name": "杜布诺",
+            "q": 31,
+            "r": 13
+          }
 
-            "side": "soviet",
+        ]
 
-            "type": "artillery",
+      }
 
-            "level": "platoon",
+    },
 
-            "regiment": "炮XX",
+    "deadlineFailureText":
+      "德军未能在规定时间内占领杜布诺，苏军防御成功"
 
-            "shortName": "炮兵排",
+  }
 
-            "equipment": "76mm",
-
-            "operational": 4,
-
-            "maximum": 4,
-
-            "q": 30,
-            "r": 17
-        }
-
-    ]
 }
