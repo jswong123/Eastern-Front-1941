@@ -1788,13 +1788,17 @@ export class Renderer {
 
             faction === "germany" ||
 
-            faction === "German"
+            faction === "German" ||
+
+            faction === "GERMAN" ||
+
+            faction === "deutsch"
 
         ) {
 
  
 
-            return "#8798a6";
+            return "#5f87b2";
 
  
 
@@ -2662,6 +2666,44 @@ export class Renderer {
 
             // ------------------------------------------------
 
+            // 实时兵力（当前 / 初始）
+
+            // ------------------------------------------------
+
+ 
+
+            const currentStrength = Math.max(0, Number(unit.strength ?? unit.manpower ?? 0));
+
+            const maximumStrength = Math.max(1, Number(unit.maxStrength ?? unit.maxManpower ?? currentStrength));
+
+ 
+
+            ctx.save();
+
+            ctx.fillStyle = "#20231f";
+
+            ctx.font = `${Math.max(7, 8 * this.camera.zoom)}px Consolas, monospace`;
+
+            ctx.textAlign = "center";
+
+            ctx.textBaseline = "bottom";
+
+            ctx.fillText(
+
+                `${currentStrength}/${maximumStrength}`,
+
+                p.x,
+
+                p.y - height / 2 - 3
+
+            );
+
+            ctx.restore();
+
+ 
+
+            // ------------------------------------------------
+
             // 单位名称
 
             // ------------------------------------------------
@@ -2833,4 +2875,3 @@ export class Renderer {
  
 
 }
-
