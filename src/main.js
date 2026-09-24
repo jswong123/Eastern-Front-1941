@@ -4273,7 +4273,284 @@ function removeDestroyedUnits() {
 // ============================================================
 
  
+// ============================================================
+// 战役结束弹窗
+// ============================================================
 
+function showVictoryModal(result) {
+
+    // --------------------------------------------------------
+    // 防止重复生成弹窗
+    // --------------------------------------------------------
+
+    const oldModal =
+        document.getElementById(
+            "victory-modal"
+        );
+
+    if (oldModal) {
+
+        oldModal.remove();
+
+    }
+
+
+    // --------------------------------------------------------
+    // 胜利阵营
+    // --------------------------------------------------------
+
+    const winner =
+        normalizeSide(
+            result?.winner
+        );
+
+
+    const isGermanVictory =
+        winner === "german";
+
+
+    const isSovietVictory =
+        winner === "soviet";
+
+
+    // --------------------------------------------------------
+    // 中文标题
+    // --------------------------------------------------------
+
+    const title =
+        isGermanVictory
+
+            ? "德军胜利"
+
+            : isSovietVictory
+
+                ? "苏军胜利"
+
+                : "战斗结束";
+
+
+    // --------------------------------------------------------
+    // 外文副标题
+    // --------------------------------------------------------
+
+    const subtitle =
+        isGermanVictory
+
+            ? "DEUTSCHER SIEG"
+
+            : isSovietVictory
+
+                ? "СОВЕТСКАЯ ПОБЕДА"
+
+                : "BATTLE ENDED";
+
+
+    // --------------------------------------------------------
+    // 胜负原因
+    // --------------------------------------------------------
+
+    const reason =
+        result?.reason ??
+        "战役已经结束";
+
+
+    // --------------------------------------------------------
+    // 当前战役日期
+    // --------------------------------------------------------
+
+    let dateText =
+        "1941年6月";
+
+
+    if (turnSystem) {
+
+        const year =
+            turnSystem.year ??
+            1941;
+
+        const month =
+            turnSystem.month ??
+            6;
+
+        const day =
+            turnSystem.day ??
+            26;
+
+        const hour =
+            turnSystem.hour ??
+            8;
+
+        const minute =
+            turnSystem.minute ??
+            0;
+
+
+        const hourText =
+            String(hour).padStart(
+                2,
+                "0"
+            );
+
+
+        const minuteText =
+            String(minute).padStart(
+                2,
+                "0"
+            );
+
+
+        dateText =
+            `${year}年${month}月${day}日　${hourText}:${minuteText}`;
+
+    }
+
+
+    // --------------------------------------------------------
+    // 当前回合
+    // --------------------------------------------------------
+
+    const currentTurn =
+        turnSystem?.turn ??
+        (
+            typeof turnSystem?.getTurnNumber ===
+            "function"
+
+                ? turnSystem.getTurnNumber()
+
+                : 1
+        );
+
+
+    // --------------------------------------------------------
+    // 创建弹窗
+    // --------------------------------------------------------
+
+    const modal =
+        document.createElement(
+            "div"
+        );
+
+
+    modal.id =
+        "victory-modal";
+
+
+    modal.innerHTML = `
+
+        <div class="victory-overlay">
+
+            <div class="victory-window">
+
+                <div class="victory-decoration">
+
+                    东线 1941 · 杜布诺战役
+
+                </div>
+
+
+                <div class="victory-title">
+
+                    ${title}
+
+                </div>
+
+
+                <div class="victory-subtitle">
+
+                    ${subtitle}
+
+                </div>
+
+
+                <div class="victory-line"></div>
+
+
+                <div class="victory-reason">
+
+                    ${reason}
+
+                </div>
+
+
+                <div class="victory-details">
+
+                    <div class="victory-detail-row">
+
+                        <span>
+                            战役时间
+                        </span>
+
+                        <strong>
+                            ${dateText}
+                        </strong>
+
+                    </div>
+
+
+                    <div class="victory-detail-row">
+
+                        <span>
+                            战役回合
+                        </span>
+
+                        <strong>
+                            第${currentTurn}回合
+                        </strong>
+
+                    </div>
+
+                </div>
+
+
+                <button
+                    class="victory-button"
+                    id="victory-close-button"
+                    type="button"
+                >
+
+                    查看战场
+
+                </button>
+
+            </div>
+
+        </div>
+
+    `;
+
+
+    document.body.appendChild(
+        modal
+    );
+
+
+    // --------------------------------------------------------
+    // 查看战场
+    // --------------------------------------------------------
+
+    const closeButton =
+        document.getElementById(
+            "victory-close-button"
+        );
+
+
+    if (closeButton) {
+
+        closeButton.addEventListener(
+
+            "click",
+
+            () => {
+
+                modal.remove();
+
+            }
+
+        );
+
+    }
+
+}
 function checkVictory() {
 
  
