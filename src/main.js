@@ -1,154 +1,30 @@
 // ============================================================
-
- 
-
- 
-
- 
-
 // main.js
-
- 
-
- 
-
- 
-
 // 东线 1941：杜布诺
-
- 
-
- 
-
- 
-
 // V1.3 — 玩家控制 / 阶段同步 / 目标胜利修正版
-
- 
-
- 
-
- 
-
 // ============================================================
-
- 
-
- 
-
- 
-
- 
-
- 
-
- 
-
- 
 
 import { WorldMap } from "./WorldMap.js";
 
- 
-
- 
-
- 
-
 import { Camera } from "./Camera.js";
-
- 
-
- 
-
- 
 
 import { Renderer } from "./Renderer.js";
 
- 
-
- 
-
- 
-
 import { UnitSelection } from "./UnitSelection.js";
-
- 
-
- 
-
- 
 
 import { GameState } from "./GameState.js";
 
- 
-
- 
-
- 
-
 import { FactionSelection } from "./FactionSelection.js";
-
- 
-
- 
-
- 
 
 import { TurnSystem } from "./TurnSystem.js";
 
- 
-
- 
-
- 
-
 import { VictorySystem } from "./systems/VictorySystem.js";
-
- 
-
- 
-
- 
-
- 
-
- 
-
- 
-
- 
 
 import { MovementSystem } from "./systems/MovementSystem.js";
 
- 
-
- 
-
- 
-
 import { CombatSystem } from "./systems/CombatSystem.js";
 
- 
-
- 
-
- 
-
 import { AISystem } from "./systems/AISystem.js";
-
- 
-
- 
-
- 
-
- 
-
- 
-
- 
-
- 
 
 import { pixelToHex } from "./Hex.js";
 
